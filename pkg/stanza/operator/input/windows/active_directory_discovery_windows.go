@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/go-ldap/ldap/v3"
+	"go.uber.org/zap"
 	"golang.org/x/sys/windows"
 )
 
@@ -112,4 +113,66 @@ func dnsToLDAPPath(dnsDomain string) string {
 		dcParts[i] = "DC=" + part
 	}
 	return "LDAP://" + strings.Join(dcParts, ",")
+}
+
+func discoverDomainControllersForJoinedDomain(logger *zap.Logger) ([]string, error) {
+	domain, err := GetLDAPDomainPath()
+	if err != nil {
+		return nil, err
+	}
+	logger.Info("root domain: " + domain)
+
+	domainControllers, err := getDomainControllersForDomain(domain)
+	if err != nil {
+		return nil, err
+	}
+	return domainControllers, nil
+}
+
+func getDomainControllersForDomain(domain string) ([]string, error) {
+	conn, err := ldap.DialURL("ldap://" + domain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to LDAP server %s: %w", domain, err)
+	}
+	defer conn.Close()
+
+	domainDN := domainToDN(domain)
+
+	searchRequest := ldap.NewSearchRequest(
+		domainDN,
+		ldap.ScopeWholeSubtree,
+		ldap.NeverDerefAliases,
+		1000,  // Size limit, keeping 1000 for safety, though we expect far fewer DCs
+		0,     // Time limit (0 = unlimited)
+		false, // Types only
+		"(&(objectClass=computer)(primaryGroupID=516))",      // LDAP filter for DCs
+		[]string{"dNSHostName", "name", "distinguishedName"}, // Attributes to retrieve
+		nil,
+	)
+
+	sr, err := conn.Search(searchRequest)
+	if err != nil {
+		return nil, fmt.Errorf("LDAP search failed for domain %s: %w", domain, err)
+	}
+
+	var domainControllers []string
+	for _, entry := range sr.Entries {
+		dc := entry.GetAttributeValue("dNSHostName")
+		if dc != "" {
+			domainControllers = append(domainControllers, dc)
+		}
+	}
+
+	return domainControllers, nil
+}
+
+// domainToDN converts a domain name to an LDAP Distinguished Name.
+// Example: "example.com" -> "DC=example,DC=com"
+func domainToDN(domain string) string {
+	parts := strings.Split(domain, ".")
+	dnParts := make([]string, len(parts))
+	for i, part := range parts {
+		dnParts[i] = "DC=" + part
+	}
+	return strings.Join(dnParts, ",")
 }
