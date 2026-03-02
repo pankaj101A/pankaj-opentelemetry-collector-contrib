@@ -7,12 +7,58 @@ package windows
 
 import (
 	"fmt"
+	"os/user"
 	"strings"
 
+	"github.com/alexbrainman/sspi"
+	"github.com/alexbrainman/sspi/ntlm"
 	"github.com/go-ldap/ldap/v3"
 	"go.uber.org/zap"
 	"golang.org/x/sys/windows"
 )
+
+// SSPINegotiator implements ldap.NTLMNegotiator using current user's SSPI credentials.
+// This mirrors C++ ADsOpenObject(..., ADS_SECURE_AUTHENTICATION) with null username/password.
+type SSPINegotiator struct {
+	creds *sspi.Credentials   // current user creds acquired from SSPI
+	ctx   *ntlm.ClientContext // NTLM client context for challenge/response
+}
+
+// Acquire current logged-on user credentials no username/password needed
+func (n *SSPINegotiator) Negotiate(domain string, workstation string) ([]byte, error) {
+	creds, err := ntlm.AcquireCurrentUserCredentials()
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire current user SSPI credentials: %w", err)
+	}
+	n.creds = creds
+
+	// Create NTLM client context and generate Type 1 (Negotiate) message
+	ctx, negotiateMsg, err := ntlm.NewClientContext(creds)
+	if err != nil {
+		creds.Release()
+		return nil, fmt.Errorf("failed to create NTLM client context: %w", err)
+	}
+	n.ctx = ctx
+	return negotiateMsg, nil
+}
+
+func (n *SSPINegotiator) ChallengeResponse(challenge []byte, _ string, _ string) ([]byte, error) {
+	// Process Type 2 (Challenge) from server, produce Type 3 (Authenticate) message
+	authenticateMsg, err := n.ctx.Update(challenge)
+	if err != nil {
+		return nil, fmt.Errorf("failed to process NTLM challenge: %w", err)
+	}
+	return authenticateMsg, nil
+}
+
+func (n *SSPINegotiator) Release() {
+	if n.ctx != nil {
+		n.ctx.Release()
+	}
+	if n.creds != nil {
+		n.creds.Release()
+	}
+}
 
 // GetLDAPDomainPath discovers the root domain path of the Active Directory service.
 // It first tries querying the LDAP Root DSE, then falls back to the Windows API.
@@ -32,8 +78,7 @@ func GetLDAPDomainPath() (string, error) {
 	}
 	fmt.Printf("return current join domain path, error while getting rootDomainPath using ldap %s \n", err)
 	// Fallback: current Joined Domain
-	ldapPath := dnsToLDAPPath(currentJoinedDomain)
-	return ldapPath, nil
+	return currentJoinedDomain, nil
 }
 
 // getRootLDAPDomainPath connects to the current machine joined DC and reads
@@ -72,7 +117,7 @@ func getRootLDAPDomainPath(domain string) (string, error) {
 	}
 
 	// namingContext is already in DN format, e.g. "DC=example,DC=com"
-	return "LDAP://" + namingContext, nil
+	return dnToHostname(namingContext), nil
 }
 
 // getLDAPDomainPathFromWindowsAPI uses GetComputerNameEx to get the DNS domain
@@ -138,6 +183,21 @@ func getDomainControllersForDomain(domain string) ([]string, error) {
 
 	domainDN := domainToDN(domain)
 
+	u, _ := user.Current()
+	fmt.Println("running as:", u.Username)
+
+	negotiator := &SSPINegotiator{}
+	defer negotiator.Release()
+
+	_, err = conn.NTLMChallengeBind(&ldap.NTLMBindRequest{
+		Negotiator:         negotiator,
+		AllowEmptyPassword: true,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("SSPI NTLM bind failed: %w", err)
+	}
+
 	searchRequest := ldap.NewSearchRequest(
 		domainDN,
 		ldap.ScopeWholeSubtree,
@@ -175,4 +235,17 @@ func domainToDN(domain string) string {
 		dnParts[i] = "DC=" + part
 	}
 	return strings.Join(dnParts, ",")
+}
+
+func dnToHostname(dn string) string {
+	parts := strings.Split(dn, ",")
+	fmt.Printf("dn is %v and dn parts are %v\n", dn, parts)
+	labels := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if strings.HasPrefix(strings.ToUpper(p), "DC=") {
+			labels = append(labels, p[3:])
+		}
+	}
+	return strings.Join(labels, ".")
 }
