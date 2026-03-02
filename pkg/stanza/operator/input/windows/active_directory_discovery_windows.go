@@ -6,6 +6,7 @@
 package windows
 
 import (
+	"errors"
 	"fmt"
 	"os/user"
 	"strings"
@@ -160,18 +161,18 @@ func dnsToLDAPPath(dnsDomain string) string {
 	return "LDAP://" + strings.Join(dcParts, ",")
 }
 
-func discoverDomainControllersForJoinedDomain(logger *zap.Logger) ([]string, error) {
+func discoverDomainControllersForJoinedDomain(logger *zap.Logger) (string, []string, error) {
 	domain, err := GetLDAPDomainPath()
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	logger.Info("root domain: " + domain)
 
 	domainControllers, err := getDomainControllersForDomain(domain)
 	if err != nil {
-		return nil, err
+		return domain, nil, err
 	}
-	return domainControllers, nil
+	return domain, domainControllers, nil
 }
 
 func getDomainControllersForDomain(domain string) ([]string, error) {
@@ -248,4 +249,21 @@ func dnToHostname(dn string) string {
 		}
 	}
 	return strings.Join(labels, ".")
+}
+
+func getJoinedDomainControllersRemoteConfig(i *Input) ([]RemoteConfig, error) {
+	var domainControllerConfigs []RemoteConfig
+	domain, domainControllers, err := discoverDomainControllersForJoinedDomain(i.Logger())
+	if err != nil {
+		return nil, errors.New("failed to discover domain controllers: " + err.Error())
+	}
+	if len(domainControllers) == 0 {
+		return nil, errors.New("no domain controllers found during discovery")
+	}
+	for _, dc := range domainControllers {
+		config := RemoteConfig{Server: dc, Username: i.remote.Username, Password: i.remote.Password, Domain: domain}
+		domainControllerConfigs = append(domainControllerConfigs, config)
+	}
+	i.Logger().Info("Discovered domain controllers", zap.Int("count", len(domainControllers)))
+	return domainControllerConfigs, nil
 }
