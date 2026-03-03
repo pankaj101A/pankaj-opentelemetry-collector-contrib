@@ -290,7 +290,7 @@ func TestInputIncludeLogRecordOriginal(t *testing.T) {
 	err := input.Start(persister)
 	require.NoError(t, err)
 
-	err = input.sendEvent(t.Context(), eventXML)
+	err = input.sendEvent(t.Context(), eventXML, input.remote)
 	require.NoError(t, err)
 
 	expectedEntry := &entry.Entry{
@@ -356,7 +356,7 @@ func TestInputIncludeLogRecordOriginalFalse(t *testing.T) {
 	err := input.Start(persister)
 	require.NoError(t, err)
 
-	err = input.sendEvent(t.Context(), eventXML)
+	err = input.sendEvent(t.Context(), eventXML, input.remote)
 	require.NoError(t, err)
 
 	expectedEntry := &entry.Entry{

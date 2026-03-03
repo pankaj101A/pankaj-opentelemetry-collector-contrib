@@ -251,9 +251,9 @@ func dnToHostname(dn string) string {
 	return strings.Join(labels, ".")
 }
 
-func getJoinedDomainControllersRemoteConfig(i *Input) ([]RemoteConfig, error) {
+func getJoinedDomainControllersRemoteConfig(logger *zap.Logger, username string, password string) ([]RemoteConfig, error) {
 	var domainControllerConfigs []RemoteConfig
-	domain, domainControllers, err := discoverDomainControllersForJoinedDomain(i.Logger())
+	domain, domainControllers, err := discoverDomainControllersForJoinedDomain(logger)
 	if err != nil {
 		return nil, errors.New("failed to discover domain controllers: " + err.Error())
 	}
@@ -261,9 +261,9 @@ func getJoinedDomainControllersRemoteConfig(i *Input) ([]RemoteConfig, error) {
 		return nil, errors.New("no domain controllers found during discovery")
 	}
 	for _, dc := range domainControllers {
-		config := RemoteConfig{Server: dc, Username: i.remote.Username, Password: i.remote.Password, Domain: domain}
+		config := RemoteConfig{Server: dc, Username: username, Password: password, Domain: domain}
 		domainControllerConfigs = append(domainControllerConfigs, config)
 	}
-	i.Logger().Info("Discovered domain controllers", zap.Int("count", len(domainControllers)))
+	logger.Info("Discovered domain controllers", zap.Int("count", len(domainControllers)))
 	return domainControllerConfigs, nil
 }
