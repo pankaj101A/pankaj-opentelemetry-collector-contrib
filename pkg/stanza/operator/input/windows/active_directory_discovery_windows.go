@@ -150,17 +150,6 @@ func getCurrentMachineJoinedDomain() (string, error) {
 	return dnsDomain, nil
 }
 
-// dnsToLDAPPath converts a DNS domain name to an LDAP path.
-// Example: "example.com" -> "LDAP://DC=example,DC=com"
-func dnsToLDAPPath(dnsDomain string) string {
-	parts := strings.Split(dnsDomain, ".")
-	dcParts := make([]string, len(parts))
-	for i, part := range parts {
-		dcParts[i] = "DC=" + part
-	}
-	return "LDAP://" + strings.Join(dcParts, ",")
-}
-
 func discoverDomainControllersForJoinedDomain(logger *zap.Logger) (string, []string, error) {
 	domain, err := GetLDAPDomainPath()
 	if err != nil {
@@ -203,9 +192,9 @@ func getDomainControllersForDomain(domain string) ([]string, error) {
 		domainDN,
 		ldap.ScopeWholeSubtree,
 		ldap.NeverDerefAliases,
-		1000,  // Size limit, keeping 1000 for safety, though we expect far fewer DCs
-		0,     // Time limit (0 = unlimited)
-		false, // Types only
+		1000,                                                 // Size limit, keeping 1000 for safety, though we expect far fewer DCs
+		0,                                                    // Time limit (0 = unlimited)
+		false,                                                // Types only
 		"(&(objectClass=computer)(primaryGroupID=516))",      // LDAP filter for DCs
 		[]string{"dNSHostName", "name", "distinguishedName"}, // Attributes to retrieve
 		nil,

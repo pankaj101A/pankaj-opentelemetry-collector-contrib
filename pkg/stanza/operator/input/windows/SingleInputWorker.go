@@ -147,30 +147,6 @@ func (siw *SingleInputWorker) stopSession() error {
 	return nil
 }
 
-func (siw *SingleInputWorker) resubscribe(ctx context.Context) error {
-	siw.logger.Info("Resubscribing", zap.String("server", siw.remote.Server))
-
-	if err := siw.subscription.Close(); err != nil {
-		return err
-	}
-	if err := siw.stopSession(); err != nil {
-		return err
-	}
-
-	siw.subscription = siw.initSubscription()
-	if err := siw.startSession(); err != nil {
-		return err
-	}
-
-	return siw.subscription.Open(
-		siw.startAt,
-		uintptr(siw.sessionHandle),
-		siw.channel,
-		siw.query,
-		siw.bookmark, // ← resume from cursor, not from startAt
-	)
-}
-
 func (siw *SingleInputWorker) pollAndRead(ctx context.Context) {
 	defer siw.wg.Done()
 	for {
