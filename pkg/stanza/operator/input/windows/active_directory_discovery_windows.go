@@ -8,7 +8,6 @@ package windows
 import (
 	"errors"
 	"fmt"
-	"os/user"
 	"strings"
 
 	"github.com/alexbrainman/sspi"
@@ -64,20 +63,20 @@ func (n *SSPINegotiator) Release() {
 // GetLDAPDomainPath discovers the root domain path of the Active Directory service.
 // It first tries querying the LDAP Root DSE, then falls back to the Windows API.
 // Returns a path like "LDAP://DC=example,DC=com".
-func GetLDAPDomainPath() (string, error) {
+func GetLDAPDomainPath(logger *zap.Logger) (string, error) {
 	currentJoinedDomain, currentDomainError := getCurrentMachineJoinedDomain()
 	if currentDomainError != nil {
 		return "", fmt.Errorf("failed to get current machine joined domain: %w", currentDomainError)
 	}
 
-	fmt.Printf("current machine joined domain is %s\n", currentJoinedDomain)
+	logger.Info("current machine joined domain is ", zap.String("currentJoinedDomain", currentJoinedDomain))
 
 	// Primary: query Root DSE with the current joined domain as the LDAP server
 	path, err := getRootLDAPDomainPath(currentJoinedDomain)
 	if err == nil {
 		return path, nil
 	}
-	fmt.Printf("return current join domain path, error while getting rootDomainPath using ldap %s \n", err)
+	logger.Error("return current join domain path, error while getting rootDomainPath using ldap ", zap.Error(err))
 	// Fallback: current Joined Domain
 	return currentJoinedDomain, nil
 }
@@ -151,7 +150,7 @@ func getCurrentMachineJoinedDomain() (string, error) {
 }
 
 func discoverDomainControllersForJoinedDomain(logger *zap.Logger) (string, []string, error) {
-	domain, err := GetLDAPDomainPath()
+	domain, err := GetLDAPDomainPath(logger)
 	if err != nil {
 		return "", nil, err
 	}
@@ -172,9 +171,6 @@ func getDomainControllersForDomain(domain string) ([]string, error) {
 	defer conn.Close()
 
 	domainDN := domainToDN(domain)
-
-	u, _ := user.Current()
-	fmt.Println("running as:", u.Username)
 
 	negotiator := &SSPINegotiator{}
 	defer negotiator.Release()
@@ -229,7 +225,6 @@ func domainToDN(domain string) string {
 
 func dnToHostname(dn string) string {
 	parts := strings.Split(dn, ",")
-	fmt.Printf("dn is %v and dn parts are %v\n", dn, parts)
 	labels := make([]string, 0, len(parts))
 	for _, p := range parts {
 		p = strings.TrimSpace(p)
