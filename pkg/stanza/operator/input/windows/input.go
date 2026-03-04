@@ -25,7 +25,7 @@ import (
 // Input is an operator that creates entries using the windows event log api.
 type Input struct {
 	helper.InputOperator
-	remoteWorker
+	SingleInputWorker
 	bookmark                 Bookmark
 	buffer                   *Buffer
 	channel                  string
@@ -54,7 +54,7 @@ type Input struct {
 
 	// Worker registry
 	workersMu sync.RWMutex
-	workers   map[string]*remoteWorker // key: normalised server name
+	workers   map[string]*SingleInputWorker // key: normalised server name
 }
 
 // newInput creates a new Input operator.
@@ -73,8 +73,8 @@ func newInput(settings component.TelemetrySettings) *Input {
 	return input
 }
 
-func (i *Input) newWorker(remote RemoteConfig) *remoteWorker {
-	w := &remoteWorker{
+func (i *Input) newWorker(remote RemoteConfig) *SingleInputWorker {
+	w := &SingleInputWorker{
 		remote:                remote,
 		channel:               "Security", //hardcoded for discovered domain controllers, can be made configurable if needed
 		query:                 nil,        // hardcoded for discovered domain controllers, can be made configurable if needed
