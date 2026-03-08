@@ -43,7 +43,7 @@ type Config struct {
 	ExcludeProviders          []string      `mapstructure:"exclude_providers,omitempty"`
 	Remote                    RemoteConfig  `mapstructure:"remote,omitempty"`
 	Query                     *string       `mapstructure:"query,omitempty"`
-	discoverDomainControllers bool          `mapstructure:"discover_domain_controllers,omitempty"`
+	DiscoverDomainControllers bool          `mapstructure:"discover_domain_controllers,omitempty"`
 }
 
 // RemoteConfig is the configuration for a remote server.
