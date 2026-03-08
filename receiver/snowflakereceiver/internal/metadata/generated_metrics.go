@@ -184,6 +184,7 @@ func (m *metricSnowflakeBillingCloudServiceTotal) init() {
 	m.data.SetUnit("{credits}")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeBillingCloudServiceTotal) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, serviceTypeAttributeValue string) {
@@ -272,6 +273,7 @@ func (m *metricSnowflakeBillingTotalCreditTotal) init() {
 	m.data.SetUnit("{credits}")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeBillingTotalCreditTotal) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, serviceTypeAttributeValue string) {
@@ -360,6 +362,7 @@ func (m *metricSnowflakeBillingVirtualWarehouseTotal) init() {
 	m.data.SetUnit("{credits}")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeBillingVirtualWarehouseTotal) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, serviceTypeAttributeValue string) {
@@ -448,6 +451,7 @@ func (m *metricSnowflakeBillingWarehouseCloudServiceTotal) init() {
 	m.data.SetUnit("{credits}")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeBillingWarehouseCloudServiceTotal) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, warehouseNameAttributeValue string) {
@@ -536,6 +540,7 @@ func (m *metricSnowflakeBillingWarehouseTotalCreditTotal) init() {
 	m.data.SetUnit("{credits}")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeBillingWarehouseTotalCreditTotal) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, warehouseNameAttributeValue string) {
@@ -624,6 +629,7 @@ func (m *metricSnowflakeBillingWarehouseVirtualWarehouseTotal) init() {
 	m.data.SetUnit("{credits}")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeBillingWarehouseVirtualWarehouseTotal) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, warehouseNameAttributeValue string) {
@@ -712,6 +718,7 @@ func (m *metricSnowflakeDatabaseBytesScannedAvg) init() {
 	m.data.SetUnit("By")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeDatabaseBytesScannedAvg) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, schemaNameAttributeValue string, executionStatusAttributeValue string, errorMessageAttributeValue string, queryTypeAttributeValue string, warehouseNameAttributeValue string, databaseNameAttributeValue string, warehouseSizeAttributeValue string) {
@@ -818,6 +825,7 @@ func (m *metricSnowflakeDatabaseQueryCount) init() {
 	m.data.SetUnit("1")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeDatabaseQueryCount) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val int64, schemaNameAttributeValue string, executionStatusAttributeValue string, errorMessageAttributeValue string, queryTypeAttributeValue string, warehouseNameAttributeValue string, databaseNameAttributeValue string, warehouseSizeAttributeValue string) {
@@ -924,6 +932,7 @@ func (m *metricSnowflakeLoginsTotal) init() {
 	m.data.SetUnit("1")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeLoginsTotal) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val int64, errorMessageAttributeValue string, reportedClientTypeAttributeValue string, isSuccessAttributeValue string) {
@@ -1018,6 +1027,7 @@ func (m *metricSnowflakePipeCreditsUsedTotal) init() {
 	m.data.SetUnit("{credits}")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakePipeCreditsUsedTotal) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, pipeNameAttributeValue string) {
@@ -1106,6 +1116,7 @@ func (m *metricSnowflakeQueryBlocked) init() {
 	m.data.SetUnit("1")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeQueryBlocked) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, warehouseNameAttributeValue string) {
@@ -1194,6 +1205,7 @@ func (m *metricSnowflakeQueryBytesDeletedAvg) init() {
 	m.data.SetUnit("By")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeQueryBytesDeletedAvg) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, schemaNameAttributeValue string, executionStatusAttributeValue string, errorMessageAttributeValue string, queryTypeAttributeValue string, warehouseNameAttributeValue string, databaseNameAttributeValue string, warehouseSizeAttributeValue string) {
@@ -1300,6 +1312,7 @@ func (m *metricSnowflakeQueryBytesSpilledLocalAvg) init() {
 	m.data.SetUnit("By")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeQueryBytesSpilledLocalAvg) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, schemaNameAttributeValue string, executionStatusAttributeValue string, errorMessageAttributeValue string, queryTypeAttributeValue string, warehouseNameAttributeValue string, databaseNameAttributeValue string, warehouseSizeAttributeValue string) {
@@ -1406,6 +1419,7 @@ func (m *metricSnowflakeQueryBytesSpilledRemoteAvg) init() {
 	m.data.SetUnit("By")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeQueryBytesSpilledRemoteAvg) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, schemaNameAttributeValue string, executionStatusAttributeValue string, errorMessageAttributeValue string, queryTypeAttributeValue string, warehouseNameAttributeValue string, databaseNameAttributeValue string, warehouseSizeAttributeValue string) {
@@ -1512,6 +1526,7 @@ func (m *metricSnowflakeQueryBytesWrittenAvg) init() {
 	m.data.SetUnit("By")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeQueryBytesWrittenAvg) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, schemaNameAttributeValue string, executionStatusAttributeValue string, errorMessageAttributeValue string, queryTypeAttributeValue string, warehouseNameAttributeValue string, databaseNameAttributeValue string, warehouseSizeAttributeValue string) {
@@ -1618,6 +1633,7 @@ func (m *metricSnowflakeQueryCompilationTimeAvg) init() {
 	m.data.SetUnit("s")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeQueryCompilationTimeAvg) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, schemaNameAttributeValue string, executionStatusAttributeValue string, errorMessageAttributeValue string, queryTypeAttributeValue string, warehouseNameAttributeValue string, databaseNameAttributeValue string, warehouseSizeAttributeValue string) {
@@ -1724,6 +1740,7 @@ func (m *metricSnowflakeQueryDataScannedCacheAvg) init() {
 	m.data.SetUnit("1")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeQueryDataScannedCacheAvg) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, schemaNameAttributeValue string, executionStatusAttributeValue string, errorMessageAttributeValue string, queryTypeAttributeValue string, warehouseNameAttributeValue string, databaseNameAttributeValue string, warehouseSizeAttributeValue string) {
@@ -1830,6 +1847,7 @@ func (m *metricSnowflakeQueryExecuted) init() {
 	m.data.SetUnit("1")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeQueryExecuted) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, warehouseNameAttributeValue string) {
@@ -1918,6 +1936,7 @@ func (m *metricSnowflakeQueryExecutionTimeAvg) init() {
 	m.data.SetUnit("s")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeQueryExecutionTimeAvg) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, schemaNameAttributeValue string, executionStatusAttributeValue string, errorMessageAttributeValue string, queryTypeAttributeValue string, warehouseNameAttributeValue string, databaseNameAttributeValue string, warehouseSizeAttributeValue string) {
@@ -2024,6 +2043,7 @@ func (m *metricSnowflakeQueryPartitionsScannedAvg) init() {
 	m.data.SetUnit("1")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeQueryPartitionsScannedAvg) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, schemaNameAttributeValue string, executionStatusAttributeValue string, errorMessageAttributeValue string, queryTypeAttributeValue string, warehouseNameAttributeValue string, databaseNameAttributeValue string, warehouseSizeAttributeValue string) {
@@ -2130,6 +2150,7 @@ func (m *metricSnowflakeQueryQueuedOverload) init() {
 	m.data.SetUnit("1")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeQueryQueuedOverload) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, warehouseNameAttributeValue string) {
@@ -2218,6 +2239,7 @@ func (m *metricSnowflakeQueryQueuedProvision) init() {
 	m.data.SetUnit("1")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeQueryQueuedProvision) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, warehouseNameAttributeValue string) {
@@ -2306,6 +2328,7 @@ func (m *metricSnowflakeQueuedOverloadTimeAvg) init() {
 	m.data.SetUnit("s")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeQueuedOverloadTimeAvg) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, schemaNameAttributeValue string, executionStatusAttributeValue string, errorMessageAttributeValue string, queryTypeAttributeValue string, warehouseNameAttributeValue string, databaseNameAttributeValue string, warehouseSizeAttributeValue string) {
@@ -2412,6 +2435,7 @@ func (m *metricSnowflakeQueuedProvisioningTimeAvg) init() {
 	m.data.SetUnit("s")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeQueuedProvisioningTimeAvg) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, schemaNameAttributeValue string, executionStatusAttributeValue string, errorMessageAttributeValue string, queryTypeAttributeValue string, warehouseNameAttributeValue string, databaseNameAttributeValue string, warehouseSizeAttributeValue string) {
@@ -2518,6 +2542,7 @@ func (m *metricSnowflakeQueuedRepairTimeAvg) init() {
 	m.data.SetUnit("s")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeQueuedRepairTimeAvg) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, schemaNameAttributeValue string, executionStatusAttributeValue string, errorMessageAttributeValue string, queryTypeAttributeValue string, warehouseNameAttributeValue string, databaseNameAttributeValue string, warehouseSizeAttributeValue string) {
@@ -2624,6 +2649,7 @@ func (m *metricSnowflakeRowsDeletedAvg) init() {
 	m.data.SetUnit("{rows}")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeRowsDeletedAvg) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, schemaNameAttributeValue string, executionStatusAttributeValue string, errorMessageAttributeValue string, queryTypeAttributeValue string, warehouseNameAttributeValue string, databaseNameAttributeValue string, warehouseSizeAttributeValue string) {
@@ -2730,6 +2756,7 @@ func (m *metricSnowflakeRowsInsertedAvg) init() {
 	m.data.SetUnit("{rows}")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeRowsInsertedAvg) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, schemaNameAttributeValue string, executionStatusAttributeValue string, errorMessageAttributeValue string, queryTypeAttributeValue string, warehouseNameAttributeValue string, databaseNameAttributeValue string, warehouseSizeAttributeValue string) {
@@ -2836,6 +2863,7 @@ func (m *metricSnowflakeRowsProducedAvg) init() {
 	m.data.SetUnit("{rows}")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeRowsProducedAvg) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, schemaNameAttributeValue string, executionStatusAttributeValue string, errorMessageAttributeValue string, queryTypeAttributeValue string, warehouseNameAttributeValue string, databaseNameAttributeValue string, warehouseSizeAttributeValue string) {
@@ -2942,6 +2970,7 @@ func (m *metricSnowflakeRowsUnloadedAvg) init() {
 	m.data.SetUnit("{rows}")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeRowsUnloadedAvg) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, schemaNameAttributeValue string, executionStatusAttributeValue string, errorMessageAttributeValue string, queryTypeAttributeValue string, warehouseNameAttributeValue string, databaseNameAttributeValue string, warehouseSizeAttributeValue string) {
@@ -3048,6 +3077,7 @@ func (m *metricSnowflakeRowsUpdatedAvg) init() {
 	m.data.SetUnit("{rows}")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeRowsUpdatedAvg) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, schemaNameAttributeValue string, executionStatusAttributeValue string, errorMessageAttributeValue string, queryTypeAttributeValue string, warehouseNameAttributeValue string, databaseNameAttributeValue string, warehouseSizeAttributeValue string) {
@@ -3154,6 +3184,7 @@ func (m *metricSnowflakeSessionIDCount) init() {
 	m.data.SetUnit("1")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeSessionIDCount) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val int64, userNameAttributeValue string) {
@@ -3229,10 +3260,9 @@ func newMetricSnowflakeSessionIDCount(cfg MetricConfig) metricSnowflakeSessionID
 }
 
 type metricSnowflakeStorageFailsafeBytesTotal struct {
-	data          pmetric.Metric // data buffer for generated metric.
-	config        MetricConfig   // metric config provided by user.
-	capacity      int            // max observed number of data points added to the metric.
-	aggDataPoints []float64      // slice containing number of aggregated datapoints at each index
+	data     pmetric.Metric // data buffer for generated metric.
+	config   MetricConfig   // metric config provided by user.
+	capacity int            // max observed number of data points added to the metric.
 }
 
 // init fills snowflake.storage.failsafe_bytes.total metric with initial data.
@@ -3247,38 +3277,10 @@ func (m *metricSnowflakeStorageFailsafeBytesTotal) recordDataPoint(start pcommon
 	if !m.config.Enabled {
 		return
 	}
-
-	dp := pmetric.NewNumberDataPoint()
+	dp := m.data.Gauge().DataPoints().AppendEmpty()
 	dp.SetStartTimestamp(start)
 	dp.SetTimestamp(ts)
-
-	var s string
-	dps := m.data.Gauge().DataPoints()
-	for i := 0; i < dps.Len(); i++ {
-		dpi := dps.At(i)
-		if dp.Attributes().Equal(dpi.Attributes()) && dp.StartTimestamp() == dpi.StartTimestamp() && dp.Timestamp() == dpi.Timestamp() {
-			switch s = m.config.AggregationStrategy; s {
-			case AggregationStrategySum, AggregationStrategyAvg:
-				dpi.SetDoubleValue(dpi.DoubleValue() + val)
-				m.aggDataPoints[i] += 1
-				return
-			case AggregationStrategyMin:
-				if dpi.DoubleValue() > val {
-					dpi.SetDoubleValue(val)
-				}
-				return
-			case AggregationStrategyMax:
-				if dpi.DoubleValue() < val {
-					dpi.SetDoubleValue(val)
-				}
-				return
-			}
-		}
-	}
-
 	dp.SetDoubleValue(val)
-	m.aggDataPoints = append(m.aggDataPoints, 1)
-	dp.MoveTo(dps.AppendEmpty())
 }
 
 // updateCapacity saves max length of data point slices that will be used for the slice capacity.
@@ -3291,11 +3293,6 @@ func (m *metricSnowflakeStorageFailsafeBytesTotal) updateCapacity() {
 // emit appends recorded metric data to a metrics slice and prepares it for recording another set of data points.
 func (m *metricSnowflakeStorageFailsafeBytesTotal) emit(metrics pmetric.MetricSlice) {
 	if m.config.Enabled && m.data.Gauge().DataPoints().Len() > 0 {
-		if m.config.AggregationStrategy == AggregationStrategyAvg {
-			for i, aggCount := range m.aggDataPoints {
-				m.data.Gauge().DataPoints().At(i).SetDoubleValue(m.data.Gauge().DataPoints().At(i).DoubleValue() / aggCount)
-			}
-		}
 		m.updateCapacity()
 		m.data.MoveTo(metrics.AppendEmpty())
 		m.init()
@@ -3313,10 +3310,9 @@ func newMetricSnowflakeStorageFailsafeBytesTotal(cfg MetricConfig) metricSnowfla
 }
 
 type metricSnowflakeStorageStageBytesTotal struct {
-	data          pmetric.Metric // data buffer for generated metric.
-	config        MetricConfig   // metric config provided by user.
-	capacity      int            // max observed number of data points added to the metric.
-	aggDataPoints []float64      // slice containing number of aggregated datapoints at each index
+	data     pmetric.Metric // data buffer for generated metric.
+	config   MetricConfig   // metric config provided by user.
+	capacity int            // max observed number of data points added to the metric.
 }
 
 // init fills snowflake.storage.stage_bytes.total metric with initial data.
@@ -3331,38 +3327,10 @@ func (m *metricSnowflakeStorageStageBytesTotal) recordDataPoint(start pcommon.Ti
 	if !m.config.Enabled {
 		return
 	}
-
-	dp := pmetric.NewNumberDataPoint()
+	dp := m.data.Gauge().DataPoints().AppendEmpty()
 	dp.SetStartTimestamp(start)
 	dp.SetTimestamp(ts)
-
-	var s string
-	dps := m.data.Gauge().DataPoints()
-	for i := 0; i < dps.Len(); i++ {
-		dpi := dps.At(i)
-		if dp.Attributes().Equal(dpi.Attributes()) && dp.StartTimestamp() == dpi.StartTimestamp() && dp.Timestamp() == dpi.Timestamp() {
-			switch s = m.config.AggregationStrategy; s {
-			case AggregationStrategySum, AggregationStrategyAvg:
-				dpi.SetDoubleValue(dpi.DoubleValue() + val)
-				m.aggDataPoints[i] += 1
-				return
-			case AggregationStrategyMin:
-				if dpi.DoubleValue() > val {
-					dpi.SetDoubleValue(val)
-				}
-				return
-			case AggregationStrategyMax:
-				if dpi.DoubleValue() < val {
-					dpi.SetDoubleValue(val)
-				}
-				return
-			}
-		}
-	}
-
 	dp.SetDoubleValue(val)
-	m.aggDataPoints = append(m.aggDataPoints, 1)
-	dp.MoveTo(dps.AppendEmpty())
 }
 
 // updateCapacity saves max length of data point slices that will be used for the slice capacity.
@@ -3375,11 +3343,6 @@ func (m *metricSnowflakeStorageStageBytesTotal) updateCapacity() {
 // emit appends recorded metric data to a metrics slice and prepares it for recording another set of data points.
 func (m *metricSnowflakeStorageStageBytesTotal) emit(metrics pmetric.MetricSlice) {
 	if m.config.Enabled && m.data.Gauge().DataPoints().Len() > 0 {
-		if m.config.AggregationStrategy == AggregationStrategyAvg {
-			for i, aggCount := range m.aggDataPoints {
-				m.data.Gauge().DataPoints().At(i).SetDoubleValue(m.data.Gauge().DataPoints().At(i).DoubleValue() / aggCount)
-			}
-		}
 		m.updateCapacity()
 		m.data.MoveTo(metrics.AppendEmpty())
 		m.init()
@@ -3397,10 +3360,9 @@ func newMetricSnowflakeStorageStageBytesTotal(cfg MetricConfig) metricSnowflakeS
 }
 
 type metricSnowflakeStorageStorageBytesTotal struct {
-	data          pmetric.Metric // data buffer for generated metric.
-	config        MetricConfig   // metric config provided by user.
-	capacity      int            // max observed number of data points added to the metric.
-	aggDataPoints []float64      // slice containing number of aggregated datapoints at each index
+	data     pmetric.Metric // data buffer for generated metric.
+	config   MetricConfig   // metric config provided by user.
+	capacity int            // max observed number of data points added to the metric.
 }
 
 // init fills snowflake.storage.storage_bytes.total metric with initial data.
@@ -3415,38 +3377,10 @@ func (m *metricSnowflakeStorageStorageBytesTotal) recordDataPoint(start pcommon.
 	if !m.config.Enabled {
 		return
 	}
-
-	dp := pmetric.NewNumberDataPoint()
+	dp := m.data.Gauge().DataPoints().AppendEmpty()
 	dp.SetStartTimestamp(start)
 	dp.SetTimestamp(ts)
-
-	var s string
-	dps := m.data.Gauge().DataPoints()
-	for i := 0; i < dps.Len(); i++ {
-		dpi := dps.At(i)
-		if dp.Attributes().Equal(dpi.Attributes()) && dp.StartTimestamp() == dpi.StartTimestamp() && dp.Timestamp() == dpi.Timestamp() {
-			switch s = m.config.AggregationStrategy; s {
-			case AggregationStrategySum, AggregationStrategyAvg:
-				dpi.SetDoubleValue(dpi.DoubleValue() + val)
-				m.aggDataPoints[i] += 1
-				return
-			case AggregationStrategyMin:
-				if dpi.DoubleValue() > val {
-					dpi.SetDoubleValue(val)
-				}
-				return
-			case AggregationStrategyMax:
-				if dpi.DoubleValue() < val {
-					dpi.SetDoubleValue(val)
-				}
-				return
-			}
-		}
-	}
-
 	dp.SetDoubleValue(val)
-	m.aggDataPoints = append(m.aggDataPoints, 1)
-	dp.MoveTo(dps.AppendEmpty())
 }
 
 // updateCapacity saves max length of data point slices that will be used for the slice capacity.
@@ -3459,11 +3393,6 @@ func (m *metricSnowflakeStorageStorageBytesTotal) updateCapacity() {
 // emit appends recorded metric data to a metrics slice and prepares it for recording another set of data points.
 func (m *metricSnowflakeStorageStorageBytesTotal) emit(metrics pmetric.MetricSlice) {
 	if m.config.Enabled && m.data.Gauge().DataPoints().Len() > 0 {
-		if m.config.AggregationStrategy == AggregationStrategyAvg {
-			for i, aggCount := range m.aggDataPoints {
-				m.data.Gauge().DataPoints().At(i).SetDoubleValue(m.data.Gauge().DataPoints().At(i).DoubleValue() / aggCount)
-			}
-		}
 		m.updateCapacity()
 		m.data.MoveTo(metrics.AppendEmpty())
 		m.init()
@@ -3494,6 +3423,7 @@ func (m *metricSnowflakeTotalElapsedTimeAvg) init() {
 	m.data.SetUnit("s")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricSnowflakeTotalElapsedTimeAvg) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, schemaNameAttributeValue string, executionStatusAttributeValue string, errorMessageAttributeValue string, queryTypeAttributeValue string, warehouseNameAttributeValue string, databaseNameAttributeValue string, warehouseSizeAttributeValue string) {

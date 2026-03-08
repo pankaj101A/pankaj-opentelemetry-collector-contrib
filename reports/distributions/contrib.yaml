@@ -12,7 +12,7 @@ components:
         - roundrobin
         - routing
         - servicegraph
-        - signaltometrics
+        - signal_to_metrics
         - spanmetrics
         - sum
     exporter:
@@ -22,7 +22,7 @@ components:
         - awskinesis
         - awss3
         - awsxray
-        - azureblob
+        - azure_blob
         - azuredataexplorer
         - azuremonitor
         - bmchelix
@@ -52,7 +52,6 @@ components:
         - prometheusremotewrite
         - pulsar
         - rabbitmq
-        - sapm
         - sentry
         - signalfx
         - splunk_hec
@@ -102,7 +101,6 @@ components:
     processor:
         - attributes
         - cumulativetodelta
-        - datadogsemantics
         - deltatocumulative
         - deltatorate
         - filter
@@ -111,7 +109,7 @@ components:
         - groupbytrace
         - interval
         - isolationforest
-        - k8sattributes
+        - k8s_attributes
         - logdedup
         - metricsgeneration
         - metricstarttime
@@ -143,9 +141,8 @@ components:
         - awss3
         - awsxray
         - azure_event_hub
+        - azure_monitor
         - azureblob
-        - azuremonitor
-        - bigip
         - carbon
         - chrony
         - cloudflare
@@ -183,7 +180,7 @@ components:
         - kubeletstats
         - libhoney
         - loki
-        - macosunifiedlogging
+        - macos_unified_logging
         - memcached
         - mongodb
         - mongodb_atlas
@@ -199,8 +196,8 @@ components:
         - podman_stats
         - postgresql
         - prometheus
+        - prometheus_remote_write
         - prometheus_simple
-        - prometheusremotewrite
         - pulsar
         - purefa
         - purefb
@@ -233,6 +230,7 @@ components:
         - windowseventlog
         - windowsperfcounters
         - windowsservice
+        - yang_grpc
         - zipkin
         - zookeeper
     scraper:

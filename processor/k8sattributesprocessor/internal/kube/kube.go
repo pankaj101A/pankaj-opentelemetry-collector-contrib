@@ -10,7 +10,6 @@ import (
 	"go.opentelemetry.io/collector/component"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/client-go/kubernetes"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig"
 )
@@ -18,8 +17,6 @@ import (
 const (
 	podNodeField            = "spec.nodeName"
 	ignoreAnnotation string = "opentelemetry.io/k8s-processor/ignore"
-	tagStartTime            = "k8s.pod.start_time"
-	tagHostName             = "k8s.pod.hostname"
 	// MetadataFromPod is used to specify to extract metadata/labels/annotations from pod
 	MetadataFromPod = "pod"
 	// MetadataFromNamespace is used to specify to extract metadata/labels/annotations from namespace
@@ -38,7 +35,6 @@ const (
 
 	ResourceSource   = "resource_attribute"
 	ConnectionSource = "connection"
-	K8sIPLabelName   = "k8s.pod.ip"
 )
 
 // PodIdentifierAttribute represents AssociationSource with matching value for pod
@@ -109,7 +105,7 @@ type ClientProvider func(component.TelemetrySettings, k8sconfig.APIConfig, Extra
 
 // APIClientsetProvider defines a func type that initializes and return a new kubernetes
 // Clientset object.
-type APIClientsetProvider func(config k8sconfig.APIConfig) (kubernetes.Interface, error)
+type APIClientsetProvider func(config k8sconfig.APIConfig) (k8sconfig.ClientBundle, error)
 
 // Pod represents a kubernetes pod.
 type Pod struct {
@@ -363,7 +359,7 @@ func (r *FieldExtractionRule) extractFromMetadata(metadata, tags map[string]stri
 		for k, v := range metadata {
 			if r.KeyRegex.MatchString(k) && v != "" {
 				var name string
-				if r.HasKeyRegexReference {
+				if r.HasKeyRegexReference && r.Name != "" {
 					var result []byte
 					name = string(r.KeyRegex.ExpandString(result, r.Name, k, r.KeyRegex.FindStringSubmatchIndex(k)))
 					tags[name] = v
