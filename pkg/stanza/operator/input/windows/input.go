@@ -170,6 +170,7 @@ func (i *Input) Start(persister operator.Persister) error {
 		})
 	}
 
+	i.publisherCache = newPublisherCache()
 	for _, remote := range remotes {
 		w := i.newWorker(remote)
 		if err := w.start(ctx); err != nil {
