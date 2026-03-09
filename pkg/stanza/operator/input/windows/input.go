@@ -94,6 +94,7 @@ func (i *Input) newWorker(remote RemoteConfig) *SingleInputWorker {
 	} else {
 		w.processEvent = i.processEventWithRenderingInfoCustomRemote
 	}
+	i.workers = make(map[string]*SingleInputWorker)
 	return w
 }
 
