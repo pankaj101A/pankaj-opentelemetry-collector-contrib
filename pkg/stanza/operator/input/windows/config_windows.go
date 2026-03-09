@@ -46,20 +46,21 @@ func (c *Config) Build(set component.TelemetrySettings) (operator.Operator, erro
 	}
 
 	input := &Input{
-		InputOperator:            inputOperator,
-		buffer:                   NewBuffer(),
-		channel:                  c.Channel,
-		ignoreChannelErrors:      c.IgnoreChannelErrors,
-		maxReads:                 c.MaxReads,
-		maxEventsPerPollCycle:    c.MaxEventsPerPoll,
-		currentMaxReads:          c.MaxReads,
-		startAt:                  c.StartAt,
-		pollInterval:             c.PollInterval,
-		raw:                      c.Raw,
-		includeLogRecordOriginal: c.IncludeLogRecordOriginal,
-		excludeProviders:         excludeProvidersSet(c.ExcludeProviders),
-		remote:                   c.Remote,
-		query:                    c.Query,
+		InputOperator:             inputOperator,
+		buffer:                    NewBuffer(),
+		channel:                   c.Channel,
+		ignoreChannelErrors:       c.IgnoreChannelErrors,
+		maxReads:                  c.MaxReads,
+		maxEventsPerPollCycle:     c.MaxEventsPerPoll,
+		currentMaxReads:           c.MaxReads,
+		startAt:                   c.StartAt,
+		pollInterval:              c.PollInterval,
+		raw:                       c.Raw,
+		includeLogRecordOriginal:  c.IncludeLogRecordOriginal,
+		excludeProviders:          excludeProvidersSet(c.ExcludeProviders),
+		remote:                    c.Remote,
+		query:                     c.Query,
+		discoverDomainControllers: c.DiscoverDomainControllers,
 	}
 	input.startRemoteSession = input.defaultStartRemoteSession
 

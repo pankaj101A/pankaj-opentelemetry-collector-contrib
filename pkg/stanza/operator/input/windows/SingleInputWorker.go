@@ -89,6 +89,7 @@ func (siw *SingleInputWorker) start(ctx context.Context) error {
 		siw.logger.Warn("Transient error opening subscription", zap.Error(err))
 	}
 	// 4. Start independent poll goroutine
+	siw.logger.Info(fmt.Sprintf("Started subscription for remote server: %s", siw.remote.Server))
 	workerCtx, cancel := context.WithCancel(ctx)
 	siw.cancel = cancel
 	siw.wg.Add(1)

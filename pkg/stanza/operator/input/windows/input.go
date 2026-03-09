@@ -85,7 +85,7 @@ func (i *Input) newWorker(remote RemoteConfig) *SingleInputWorker {
 		maxReads:              1000,
 		currentMaxReads:       1000,
 		maxEventsPerPollCycle: 1000,
-		pollInterval:          24 * time.Hour,
+		pollInterval:          i.pollInterval,
 		persister:             i.persister,
 		logger:                i.Logger().With(zap.String("worker-server", remote.Server)),
 	}
@@ -161,6 +161,7 @@ func (i *Input) Start(persister operator.Persister) error {
 		}
 	} else {
 		//localhost events
+		i.Logger().Info("domain controller discovery is not applicable for local server, ignoring discover_domain_controllers setting and reading from local event logs only")
 		remotes = append(remotes, RemoteConfig{
 			Server:   "",
 			Domain:   "",
@@ -168,6 +169,9 @@ func (i *Input) Start(persister operator.Persister) error {
 			Password: "",
 		})
 	}
+
+	i.publisherCache = newPublisherCache()
+	i.workers = make(map[string]*SingleInputWorker)
 
 	for _, remote := range remotes {
 		w := i.newWorker(remote)
