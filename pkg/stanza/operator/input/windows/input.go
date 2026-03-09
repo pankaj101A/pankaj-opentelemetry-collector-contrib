@@ -85,7 +85,7 @@ func (i *Input) newWorker(remote RemoteConfig) *SingleInputWorker {
 		maxReads:              1000,
 		currentMaxReads:       1000,
 		maxEventsPerPollCycle: 1000,
-		pollInterval:          24 * time.Hour,
+		pollInterval:          i.pollInterval,
 		persister:             i.persister,
 		logger:                i.Logger().With(zap.String("worker-server", remote.Server)),
 	}
