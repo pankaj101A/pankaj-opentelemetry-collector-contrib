@@ -71,18 +71,18 @@ func newInput(settings component.TelemetrySettings) *Input {
 	return input
 }
 
-func (i *Input) newWorker(remote RemoteConfig) *SingleInputWorker {
+func (i *Input) newWorker(remote RemoteConfig, channel string, query *string) *SingleInputWorker {
 	w := &SingleInputWorker{
 		remote:                remote,
-		channel:               "Security", // hardcoded for discovered domain controllers, can be made configurable if needed
-		query:                 nil,        // hardcoded for discovered domain controllers, can be made configurable if needed
+		channel:               channel,
+		query:                 query,
 		startAt:               i.startAt,
 		buffer:                NewBuffer(),
 		bookmark:              NewBookmark(),
 		publisherCache:        newPublisherCache(),
-		maxReads:              1000,
-		currentMaxReads:       1000,
-		maxEventsPerPollCycle: 1000,
+		maxReads:              i.maxReads,
+		currentMaxReads:       i.currentMaxReads,
+		maxEventsPerPollCycle: i.maxEventsPerPollCycle,
 		pollInterval:          i.pollInterval,
 		persister:             i.persister,
 		logger:                i.Logger().With(zap.String("worker-server", remote.Server)),
@@ -136,46 +136,47 @@ func (i *Input) Start(persister operator.Persister) error {
 
 	i.persister = persister
 
-	var remotes []RemoteConfig
+	var workersList []*SingleInputWorker
 	if i.isRemote() {
-		remotes = append(remotes, i.remote)
 		if i.discoverDomainControllers {
 			domainControllers, err := getJoinedDomainControllersRemoteConfig(i.Logger(), i.remote.Username, i.remote.Password)
 			if err != nil {
 				i.Logger().Error("Failed to discover domain controllers for remote server, continuing with configured server only", zap.String("server", i.remote.Server), zap.Error(err))
 			} else {
-				remotes = append(remotes, domainControllers...)
+				for _, dc := range domainControllers {
+					i.Logger().Info("Discovered domain controller for remote server", zap.String("server", i.remote.Server), zap.String("domain_controller", dc.Server))
+					workersList = append(workersList, i.newWorker(dc, "Security", nil))
+				}
 			}
 		}
 	} else {
 		// localhost events
 		i.Logger().Info("domain controller discovery is not applicable for local server, ignoring discover_domain_controllers setting and reading from local event logs only")
-		remotes = append(remotes, RemoteConfig{
+		i.remote = RemoteConfig{
 			Server:   "",
 			Domain:   "",
 			Username: "",
 			Password: "",
-		})
+		}
 	}
-
+	workersList = append(workersList, i.newWorker(i.remote, i.channel, i.query))
 	i.publisherCache = newPublisherCache()
 	i.workers = make(map[string]*SingleInputWorker)
 
-	for _, remote := range remotes {
-		w := i.newWorker(remote)
+	for _, w := range workersList {
 		if err := w.start(ctx); err != nil {
 			if !i.ignoreChannelErrors {
 				stopErr := i.stopAllWorkers()
 				if stopErr != nil {
 					return fmt.Errorf("failed to stop all workers: %w", stopErr)
 				}
-				return fmt.Errorf("failed to start worker %q: %w", remote.Server, err)
+				return fmt.Errorf("failed to start worker %q: %w", w.remote.Server, err)
 			}
 			i.Logger().Warn("Failed to start worker, skipping",
-				zap.String("server", remote.Server), zap.Error(err))
+				zap.String("server", w.remote.Server), zap.Error(err))
 			continue
 		}
-		i.workers[workerKey(remote)] = w
+		i.workers[workerKey(w.remote)] = w
 	}
 	return nil
 }
