@@ -25,7 +25,7 @@ type SSPINegotiator struct {
 }
 
 // Acquire current logged-on user credentials no username/password needed
-func (n *SSPINegotiator) Negotiate(domain string, workstation string) ([]byte, error) {
+func (n *SSPINegotiator) Negotiate(_, _ string) ([]byte, error) {
 	creds, err := ntlm.AcquireCurrentUserCredentials()
 	if err != nil {
 		return nil, fmt.Errorf("failed to acquire current user SSPI credentials: %w", err)
@@ -35,14 +35,14 @@ func (n *SSPINegotiator) Negotiate(domain string, workstation string) ([]byte, e
 	// Create NTLM client context and generate Type 1 (Negotiate) message
 	ctx, negotiateMsg, err := ntlm.NewClientContext(creds)
 	if err != nil {
-		creds.Release()
+		_ = creds.Release()
 		return nil, fmt.Errorf("failed to create NTLM client context: %w", err)
 	}
 	n.ctx = ctx
 	return negotiateMsg, nil
 }
 
-func (n *SSPINegotiator) ChallengeResponse(challenge []byte, _ string, _ string) ([]byte, error) {
+func (n *SSPINegotiator) ChallengeResponse(challenge []byte, _, _ string) ([]byte, error) {
 	// Process Type 2 (Challenge) from server, produce Type 3 (Authenticate) message
 	authenticateMsg, err := n.ctx.Update(challenge)
 	if err != nil {
@@ -53,10 +53,10 @@ func (n *SSPINegotiator) ChallengeResponse(challenge []byte, _ string, _ string)
 
 func (n *SSPINegotiator) Release() {
 	if n.ctx != nil {
-		n.ctx.Release()
+		_ = n.ctx.Release()
 	}
 	if n.creds != nil {
-		n.creds.Release()
+		_ = n.creds.Release()
 	}
 }
 
@@ -108,12 +108,12 @@ func getRootLDAPDomainPath(domain string) (string, error) {
 	}
 
 	if len(res.Entries) == 0 {
-		return "", fmt.Errorf("LDAP Root DSE returned no entries")
+		return "", errors.New("LDAP Root DSE returned no entries")
 	}
 
 	namingContext := res.Entries[0].GetAttributeValue("defaultNamingContext")
 	if namingContext == "" {
-		return "", fmt.Errorf("defaultNamingContext attribute is empty")
+		return "", errors.New("defaultNamingContext attribute is empty")
 	}
 
 	// namingContext is already in DN format, e.g. "DC=example,DC=com"
@@ -126,12 +126,12 @@ func getCurrentMachineJoinedDomain() (string, error) {
 	// First call to get required buffer size
 	var size uint32
 	err := windows.GetComputerNameEx(windows.ComputerNameDnsDomain, nil, &size)
-	if err != nil && err != windows.ERROR_MORE_DATA {
+	if err != nil && !errors.Is(err, windows.ERROR_MORE_DATA) {
 		return "", fmt.Errorf("GetComputerNameEx (size query) failed: %w", err)
 	}
 
 	if size == 0 {
-		return "", fmt.Errorf("computer is not joined to a domain")
+		return "", errors.New("computer is not joined to a domain")
 	}
 
 	buf := make([]uint16, size)
@@ -143,7 +143,7 @@ func getCurrentMachineJoinedDomain() (string, error) {
 	// Decode UTF-16 to string, trimming null terminator
 	dnsDomain := windows.UTF16ToString(buf[:size])
 	if dnsDomain == "" {
-		return "", fmt.Errorf("computer is not joined to a domain (empty DNS domain)")
+		return "", errors.New("computer is not joined to a domain (empty DNS domain)")
 	}
 
 	return dnsDomain, nil
@@ -179,7 +179,6 @@ func getDomainControllersForDomain(domain string) ([]string, error) {
 		Negotiator:         negotiator,
 		AllowEmptyPassword: true,
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("SSPI NTLM bind failed: %w", err)
 	}
@@ -188,9 +187,9 @@ func getDomainControllersForDomain(domain string) ([]string, error) {
 		domainDN,
 		ldap.ScopeWholeSubtree,
 		ldap.NeverDerefAliases,
-		1000,                                                 // Size limit, keeping 1000 for safety, though we expect far fewer DCs
-		0,                                                    // Time limit (0 = unlimited)
-		false,                                                // Types only
+		1000,  // Size limit, keeping 1000 for safety, though we expect far fewer DCs
+		0,     // Time limit (0 = unlimited)
+		false, // Types only
 		"(&(objectClass=computer)(primaryGroupID=516))",      // LDAP filter for DCs
 		[]string{"dNSHostName", "name", "distinguishedName"}, // Attributes to retrieve
 		nil,
@@ -235,7 +234,7 @@ func dnToHostname(dn string) string {
 	return strings.Join(labels, ".")
 }
 
-func getJoinedDomainControllersRemoteConfig(logger *zap.Logger, username string, password string) ([]RemoteConfig, error) {
+func getJoinedDomainControllersRemoteConfig(logger *zap.Logger, username, password string) ([]RemoteConfig, error) {
 	var domainControllerConfigs []RemoteConfig
 	domain, domainControllers, err := discoverDomainControllersForJoinedDomain(logger)
 	if err != nil {

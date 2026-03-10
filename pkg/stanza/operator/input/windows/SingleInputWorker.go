@@ -1,3 +1,6 @@
+// Copyright The OpenTelemetry Authors
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build windows
 
 package windows // import "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza/operator/input/windows"
@@ -10,10 +13,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza/operator"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"golang.org/x/sys/windows"
+
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza/operator"
 )
 
 type SingleInputWorker struct {
@@ -60,7 +64,7 @@ func (siw *SingleInputWorker) start(ctx context.Context) error {
 		}
 	}
 	siw.subscription = siw.initSubscription()
-	// 2. Load or initialise bookmark
+	// 2. Load or initialize bookmark
 	_, err := siw.loadBookmark(ctx)
 	if err != nil {
 		return err
@@ -83,14 +87,12 @@ func (siw *SingleInputWorker) start(ctx context.Context) error {
 			}
 			siw.logger.Warn(errorString, zap.Error(err))
 			return err
-		} else {
-			if siw.isRemote() {
-				siw.logger.Warn("Transient error opening subscription for remote server, continuing", zap.String("server", siw.remote.Server), zap.Error(err))
-			} else {
-				siw.logger.Warn("Transient error opening local subscription, continuing", zap.Error(err))
-			}
 		}
-		siw.logger.Warn("Transient error opening subscription", zap.Error(err))
+		if siw.isRemote() {
+			siw.logger.Warn("Transient error opening subscription for remote server, continuing", zap.String("server", siw.remote.Server), zap.Error(err))
+		} else {
+			siw.logger.Warn("Transient error opening local subscription, continuing", zap.Error(err))
+		}
 	}
 	// 4. Start independent poll goroutine
 	siw.logger.Info(fmt.Sprintf("Started subscription for remote server: %s", siw.remote.Server))
@@ -123,7 +125,7 @@ func (siw *SingleInputWorker) stop() error {
 }
 
 func (siw *SingleInputWorker) startSession() error {
-	//remote session is only needed if Server is specified; otherwise we stay local and sessionHandle remains 0
+	// remote session is only needed if Server is specified; otherwise we stay local and sessionHandle remains 0
 	if siw.remote.Server == "" {
 		return nil
 	}
@@ -240,11 +242,14 @@ func (siw *SingleInputWorker) readBatch(ctx context.Context) bool {
 }
 
 func (siw *SingleInputWorker) updateBookmarkOffset(ctx context.Context, event Event) {
-	if err := siw.bookmark.Update(event); err != nil { /* log, return */
+	if err := siw.bookmark.Update(event); err != nil {
+		siw.logger.Error("Failed to update bookmark from event", zap.Error(err), zap.String("server", siw.remote.Server))
+		return
 	}
 
 	bookmarkXML, err := siw.bookmark.Render(siw.buffer)
-	if err != nil { /* log, return */
+	if err != nil {
+		siw.logger.Error("Failed to render bookmark xml", zap.Error(err), zap.String("server", siw.remote.Server))
 	}
 
 	if err := siw.persister.Set(ctx, siw.getPersistKey(), []byte(bookmarkXML)); err != nil {

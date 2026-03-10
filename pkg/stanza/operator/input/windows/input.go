@@ -26,7 +26,6 @@ import (
 type Input struct {
 	helper.InputOperator
 	SingleInputWorker
-	bookmark                 Bookmark
 	buffer                   *Buffer
 	channel                  string
 	ignoreChannelErrors      bool
@@ -41,7 +40,6 @@ type Input struct {
 	persister                operator.Persister
 	publisherCache           publisherCache
 	cancel                   context.CancelFunc
-	wg                       sync.WaitGroup
 	subscription             Subscription
 	maxEventsPerPollCycle    int
 	eventsReadInPollCycle    int
@@ -76,7 +74,7 @@ func newInput(settings component.TelemetrySettings) *Input {
 func (i *Input) newWorker(remote RemoteConfig) *SingleInputWorker {
 	w := &SingleInputWorker{
 		remote:                remote,
-		channel:               "Security", //hardcoded for discovered domain controllers, can be made configurable if needed
+		channel:               "Security", // hardcoded for discovered domain controllers, can be made configurable if needed
 		query:                 nil,        // hardcoded for discovered domain controllers, can be made configurable if needed
 		startAt:               i.startAt,
 		buffer:                NewBuffer(),
@@ -121,17 +119,6 @@ func (i *Input) defaultStartRemoteSession() error {
 	return nil
 }
 
-// stopRemoteSession stops the remote session if it is active.
-func (i *Input) stopRemoteSession() error {
-	if i.remoteSessionHandle != 0 {
-		if err := evtClose(uintptr(i.remoteSessionHandle)); err != nil {
-			return fmt.Errorf("failed to close remote session handle for server %s: %w", i.remote.Server, err)
-		}
-		i.remoteSessionHandle = 0
-	}
-	return nil
-}
-
 // isRemote checks if the input is configured for remote access.
 func (i *Input) isRemote() bool {
 	return i.remote.Server != ""
@@ -161,7 +148,7 @@ func (i *Input) Start(persister operator.Persister) error {
 			}
 		}
 	} else {
-		//localhost events
+		// localhost events
 		i.Logger().Info("domain controller discovery is not applicable for local server, ignoring discover_domain_controllers setting and reading from local event logs only")
 		remotes = append(remotes, RemoteConfig{
 			Server:   "",
@@ -178,8 +165,11 @@ func (i *Input) Start(persister operator.Persister) error {
 		w := i.newWorker(remote)
 		if err := w.start(ctx); err != nil {
 			if !i.ignoreChannelErrors {
-				i.stopAllWorkers()
-				return fmt.Errorf("start worker %q: %w", remote.Server, err)
+				stopErr := i.stopAllWorkers()
+				if stopErr != nil {
+					return fmt.Errorf("failed to stop all workers: %w", stopErr)
+				}
+				return fmt.Errorf("failed to start worker %q: %w", remote.Server, err)
 			}
 			i.Logger().Warn("Failed to start worker, skipping",
 				zap.String("server", remote.Server), zap.Error(err))
