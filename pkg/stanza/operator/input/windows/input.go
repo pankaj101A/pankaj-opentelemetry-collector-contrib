@@ -88,6 +88,7 @@ func (i *Input) newWorker(remote RemoteConfig) *SingleInputWorker {
 		pollInterval:          i.pollInterval,
 		persister:             i.persister,
 		logger:                i.Logger().With(zap.String("worker-server", remote.Server)),
+		ignoreChannelErrors:   i.ignoreChannelErrors,
 	}
 	if i.raw {
 		w.processEvent = i.processEventWithoutRenderingInfoCustomRemote

@@ -1,6 +1,6 @@
 //go:build windows
 
-package windows
+package windows // import "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza/operator/input/windows"
 
 import (
 	"context"
@@ -43,9 +43,10 @@ type SingleInputWorker struct {
 	persister operator.Persister
 
 	// Lifecycle
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
-	logger *zap.Logger
+	cancel              context.CancelFunc
+	wg                  sync.WaitGroup
+	logger              *zap.Logger
+	ignoreChannelErrors bool
 
 	// Callback into parent (stateless, safe to share)
 	processEvent func(context.Context, Event, RemoteConfig) error
@@ -76,6 +77,9 @@ func (siw *SingleInputWorker) start(ctx context.Context) error {
 				errorString = fmt.Sprintf("failed to open subscription for remote server: %s", siw.remote.Server)
 			} else {
 				errorString = "failed to open local subscription"
+			}
+			if !siw.ignoreChannelErrors {
+				return fmt.Errorf("%s, error: %w", errorString, err)
 			}
 			siw.logger.Warn(errorString, zap.Error(err))
 			return err
