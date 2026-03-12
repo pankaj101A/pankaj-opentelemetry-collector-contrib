@@ -4,7 +4,6 @@
 package windows // import "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza/operator/input/windows"
 
 import (
-	"strings"
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza/operator/helper"
@@ -52,8 +51,4 @@ type RemoteConfig struct {
 	Username string `mapstructure:"username"`
 	Password string `mapstructure:"password"`
 	Domain   string `mapstructure:"domain,omitempty"`
-}
-
-func workerKey(r RemoteConfig) string {
-	return strings.ToLower(strings.TrimSpace(r.Server))
 }

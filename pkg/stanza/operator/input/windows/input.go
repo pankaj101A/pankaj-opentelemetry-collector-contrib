@@ -147,7 +147,7 @@ func (i *Input) Start(persister operator.Persister) error {
 				zap.String("server", w.remote.Server), zap.Error(err))
 			continue
 		}
-		i.workers[workerKey(w.remote)] = w
+		i.workers[workerKey(w)] = w
 	}
 	return nil
 }

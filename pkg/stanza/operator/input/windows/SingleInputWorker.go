@@ -74,7 +74,6 @@ func (siw *SingleInputWorker) start(ctx context.Context) error {
 	//    When offsetXML != "", bookmark drives position; startAt is ignored by the API.
 	//    When offsetXML == "", startAt ("beginning" | "end") drives position.
 	// removed subscriptionError
-	subscriptionError := false
 	subscription := siw.initSubscription()
 	fmt.Printf("Opening subscription for server %s, channel %s, query %v, startAt %s handle %v \n", siw.remote.Server, siw.channel, siw.query, siw.startAt, siw.sessionHandle)
 	if err := subscription.Open(siw.startAt, uintptr(siw.sessionHandle), siw.channel, siw.query, siw.bookmark); err != nil {
@@ -85,11 +84,8 @@ func (siw *SingleInputWorker) start(ctx context.Context) error {
 			} else {
 				errorString = "failed to open local subscription"
 			}
-			if !siw.ignoreChannelErrors {
-				return fmt.Errorf("%s, error: %w", errorString, err)
-			}
-			subscriptionError = true
 			siw.logger.Warn(errorString, zap.Error(err))
+			return fmt.Errorf("%s, error: %w", errorString, err)
 		}
 		if siw.isRemote() {
 			siw.logger.Warn("Transient error opening subscription for remote server, continuing", zap.String("server", siw.remote.Server), zap.Error(err))
@@ -98,14 +94,12 @@ func (siw *SingleInputWorker) start(ctx context.Context) error {
 		}
 	}
 	// 4. Start independent poll goroutine
-	if !subscriptionError {
-		siw.logger.Info(fmt.Sprintf("Started subscription for remote server: %s", siw.remote.Server))
-		siw.subscription = subscription
-		workerCtx, cancel := context.WithCancel(ctx)
-		siw.cancel = cancel
-		siw.wg.Add(1)
-		go siw.pollAndRead(workerCtx)
-	}
+	siw.logger.Info(fmt.Sprintf("Started subscription for remote server: %s", siw.remote.Server))
+	siw.subscription = subscription
+	workerCtx, cancel := context.WithCancel(ctx)
+	siw.cancel = cancel
+	siw.wg.Add(1)
+	go siw.pollAndRead(workerCtx)
 
 	return nil
 }
@@ -319,4 +313,8 @@ func (siw *SingleInputWorker) initSubscription() Subscription {
 		return NewRemoteSubscription(siw.remote.Server)
 	}
 	return NewLocalSubscription()
+}
+
+func workerKey(worker *SingleInputWorker) string {
+	return fmt.Sprintf("%s_%s", strings.ToLower(strings.TrimSpace(worker.remote.Server)), worker.channel)
 }

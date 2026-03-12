@@ -32,6 +32,12 @@ func newTestInput() *Input {
 	})
 }
 
+func newTestInputWithLogger(logger *zap.Logger) *Input {
+	return newInput(component.TelemetrySettings{
+		Logger: logger,
+	})
+}
+
 // TestInputCreate_Stop ensures the input correctly shuts down even if it was never started.
 func TestInputCreate_Stop(t *testing.T) {
 	input := newTestInput()
@@ -512,4 +518,558 @@ func TestInputRead_Batching(t *testing.T) {
 	assert.Equal(t, requiredNextCalls, nextCalls)
 	assert.Equal(t, maxEventsToEmit, processedEvents)
 	assert.Equal(t, input.currentMaxReads, input.maxReads)
+}
+
+//
+// Domain Controller Discovery Tests
+//
+
+// mockGetJoinedDomainControllers is a test helper to override the DC discovery function.
+// The actual override requires replacing getJoinedDomainControllersRemoteConfig at the package level.
+// We use a variable-based approach consistent with how evtSubscribe is mocked.
+
+var originalGetJoinedDomainControllersRemoteConfig = getJoinedDomainControllersRemoteConfig
+
+func restoreGetJoinedDomainControllers() {
+	getJoinedDomainControllersRemoteConfig = originalGetJoinedDomainControllersRemoteConfig
+}
+
+// TestDCDiscovery_FlagDisabledByDefault ensures discover_domain_controllers defaults to false.
+func TestDCDiscovery_FlagDisabledByDefault(t *testing.T) {
+	cfg := NewConfig()
+	assert.False(t, cfg.DiscoverDomainControllers, "discover_domain_controllers should default to false")
+}
+
+// TestDCDiscovery_LocalIgnoresFlag ensures that for local (non-remote) input,
+// the discover_domain_controllers flag is ignored and only a local worker is started.
+func TestDCDiscovery_LocalIgnoresFlag(t *testing.T) {
+	core, logs := observer.New(zap.InfoLevel)
+	logger := zap.New(core)
+
+	persister := testutil.NewMockPersister("")
+	input := newTestInputWithLogger(logger)
+	input.channel = "Application"
+	input.startAt = "end"
+	input.pollInterval = 1 * time.Second
+	input.ignoreChannelErrors = true
+	input.discoverDomainControllers = true
+	// remote is empty → local mode
+
+	err := input.Start(persister)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, input.Stop()) })
+
+	// Should log a message about DC discovery not being applicable
+	found := false
+	for _, log := range logs.All() {
+		if log.Level == zap.InfoLevel &&
+			containsString(log.Message, "domain controller discovery is not applicable") {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "Expected log message about DC discovery not applicable for local server")
+
+	// Only the local worker should be registered
+	input.workersMu.RLock()
+	defer input.workersMu.RUnlock()
+	assert.Len(t, input.workers, 1, "Should have exactly one local worker")
+	_, hasLocal := input.workers["_Application"]
+	assert.True(t, hasLocal, "The single worker should have empty key (local)")
+}
+
+// TestDCDiscovery_RemoteEnabled ensures that when discover_domain_controllers is false
+// and remote is configured, only the configured remote server worker is started.
+func TestDCDiscovery_RemoteEnabled(t *testing.T) {
+	originalEvtSubscribe := evtSubscribe
+	originalEvtClose := evtClose
+	evtSubscribe = func(_ uintptr, _ windows.Handle, _, _ *uint16, _, _, _ uintptr, _ uint32) (uintptr, error) {
+		return 42, nil
+	}
+	evtClose = func(_ uintptr) error { return nil }
+
+	t.Cleanup(func() {
+		evtSubscribe = originalEvtSubscribe // runs SECOND
+		evtClose = originalEvtClose
+	})
+
+	persister := testutil.NewMockPersister("")
+	input := newTestInput()
+	input.startRemoteSession = func(_ *SingleInputWorker) error { return nil }
+	input.channel = "Security"
+	input.startAt = "end"
+	input.pollInterval = 1 * time.Second
+	input.discoverDomainControllers = false
+	input.remote = RemoteConfig{
+		Server:   "configured-server",
+		Username: "user",
+		Password: "pass",
+	}
+
+	err := input.Start(persister)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, input.Stop()) })
+
+	input.workersMu.RLock()
+	defer input.workersMu.RUnlock()
+	assert.Len(t, input.workers, 1, "Should have exactly one worker (the configured remote)")
+	_, hasConfigured := input.workers["configured-server_Security"]
+	assert.True(t, hasConfigured, "Worker for configured-server should exist")
+}
+
+// TestDCDiscovery_DiscoverySucceeds_AllWorkersStarted ensures that when DC discovery
+// returns multiple controllers, a worker is started for each discovered DC plus the
+// originally configured remote server.
+func TestDCDiscovery_DiscoverySucceeds_AllWorkersStarted(t *testing.T) {
+	originalEvtSubscribe := evtSubscribe
+	originalEvtClose := evtClose
+
+	evtSubscribe = func(_ uintptr, _ windows.Handle, _, _ *uint16, _, _, _ uintptr, _ uint32) (uintptr, error) {
+		return 42, nil
+	}
+	evtClose = func(_ uintptr) error { return nil }
+
+	t.Cleanup(func() {
+		evtSubscribe = originalEvtSubscribe // runs SECOND
+		evtClose = originalEvtClose
+	})
+
+	originalGetDCs := getJoinedDomainControllersRemoteConfig
+	defer func() { getJoinedDomainControllersRemoteConfig = originalGetDCs }()
+	getJoinedDomainControllersRemoteConfig = func(_ *zap.Logger, username, password string) ([]RemoteConfig, error) {
+		return []RemoteConfig{
+			{Server: "dc1.example.com", Username: username, Password: password},
+			{Server: "dc2.example.com", Username: username, Password: password},
+			{Server: "dc3.example.com", Username: username, Password: password},
+		}, nil
+	}
+
+	persister := testutil.NewMockPersister("")
+	input := newTestInput()
+	input.startRemoteSession = func(_ *SingleInputWorker) error { return nil }
+	input.channel = "Application"
+	input.startAt = "end"
+	input.pollInterval = 1 * time.Second
+	input.discoverDomainControllers = true
+	input.remote = RemoteConfig{
+		Server:   "configured-server",
+		Username: "admin",
+		Password: "secret",
+	}
+
+	err := input.Start(persister)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, input.Stop()) })
+
+	input.workersMu.RLock()
+	defer input.workersMu.RUnlock()
+
+	// 3 discovered DCs + 1 configured server = 4 workers
+	assert.Len(t, input.workers, 4, "Should have 4 workers (3 discovered + 1 configured)")
+	assert.Contains(t, input.workers, "dc1.example.com_Security")
+	assert.Contains(t, input.workers, "dc2.example.com_Security")
+	assert.Contains(t, input.workers, "dc3.example.com_Security")
+	assert.Contains(t, input.workers, "configured-server_Application")
+}
+
+// TestDCDiscovery_DiscoverySucceeds_DCWorkersUseSecurityChannel verifies that
+// discovered DC workers use the "Security" channel and nil query.
+func TestDCDiscovery_DiscoverySucceeds_DCWorkersUseSecurityChannel(t *testing.T) {
+	originalEvtSubscribe := evtSubscribe
+	originalEvtClose := evtClose
+	originalGetDCs := getJoinedDomainControllersRemoteConfig
+
+	evtSubscribe = func(_ uintptr, _ windows.Handle, _, _ *uint16, _, _, _ uintptr, _ uint32) (uintptr, error) {
+		return 42, nil
+	}
+	evtClose = func(_ uintptr) error { return nil }
+
+	t.Cleanup(func() {
+		evtSubscribe = originalEvtSubscribe // runs SECOND
+		evtClose = originalEvtClose
+	})
+	defer func() { getJoinedDomainControllersRemoteConfig = originalGetDCs }()
+	getJoinedDomainControllersRemoteConfig = func(_ *zap.Logger, username, password string) ([]RemoteConfig, error) {
+		return []RemoteConfig{
+			{Server: "dc1.example.com", Username: username, Password: password},
+		}, nil
+	}
+
+	var capturedWorkers []*SingleInputWorker
+	originalNewWorker := newWorker
+	_ = originalNewWorker // newWorker is a package-level func, capture via startRemoteSession
+
+	persister := testutil.NewMockPersister("")
+	input := newTestInput()
+	input.startRemoteSession = func(w *SingleInputWorker) error {
+		capturedWorkers = append(capturedWorkers, w)
+		return nil
+	}
+	input.channel = "Application"
+	query := "*[System]"
+	input.query = &query
+	input.startAt = "end"
+	input.pollInterval = 1 * time.Second
+	input.discoverDomainControllers = true
+	input.remote = RemoteConfig{
+		Server:   "configured-server",
+		Username: "admin",
+		Password: "secret",
+	}
+
+	err := input.Start(persister)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, input.Stop()) })
+
+	// Find the DC worker and the configured worker
+	var dcWorker, configuredWorker *SingleInputWorker
+	for _, w := range capturedWorkers {
+		if w.remote.Server == "dc1.example.com" {
+			dcWorker = w
+		}
+		if w.remote.Server == "configured-server" {
+			configuredWorker = w
+		}
+	}
+
+	require.NotNil(t, dcWorker, "DC worker should have been created")
+	assert.Equal(t, "Security", dcWorker.channel, "DC worker should use Security channel")
+	assert.Nil(t, dcWorker.query, "DC worker should have nil query")
+
+	require.NotNil(t, configuredWorker, "Configured worker should have been created")
+	assert.Equal(t, "Application", configuredWorker.channel, "Configured worker should use original channel")
+	assert.NotNil(t, configuredWorker.query, "Configured worker should retain query")
+	assert.Equal(t, "*[System]", *configuredWorker.query)
+}
+
+// TestDCDiscovery_DiscoveryReturnsNil_OnlyConfiguredServerStarts ensures nil result
+// from DC discovery still starts the configured server.
+func TestDCDiscovery_DiscoveryReturnsNil_OnlyConfiguredServerStarts(t *testing.T) {
+	originalEvtSubscribe := evtSubscribe
+	evtSubscribe = func(_ uintptr, _ windows.Handle, _, _ *uint16, _, _, _ uintptr, _ uint32) (uintptr, error) {
+		return 42, nil
+	}
+
+	originalEvtClose := evtClose
+	evtClose = func(_ uintptr) error { return nil }
+
+	t.Cleanup(func() {
+		evtSubscribe = originalEvtSubscribe // runs SECOND
+		evtClose = originalEvtClose
+	})
+	originalGetDCs := getJoinedDomainControllersRemoteConfig
+	defer func() { getJoinedDomainControllersRemoteConfig = originalGetDCs }()
+	getJoinedDomainControllersRemoteConfig = func(_ *zap.Logger, _, _ string) ([]RemoteConfig, error) {
+		return nil, nil
+	}
+
+	persister := testutil.NewMockPersister("")
+	input := newTestInput()
+	input.startRemoteSession = func(_ *SingleInputWorker) error { return nil }
+	input.channel = "Security"
+	input.startAt = "end"
+	input.pollInterval = 1 * time.Second
+	input.discoverDomainControllers = true
+	input.remote = RemoteConfig{
+		Server:   "configured-server",
+		Username: "admin",
+		Password: "secret",
+	}
+
+	err := input.Start(persister)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, input.Stop()) })
+
+	input.workersMu.RLock()
+	defer input.workersMu.RUnlock()
+	assert.Len(t, input.workers, 1)
+	assert.Contains(t, input.workers, "configured-server_Security")
+}
+
+// TestDCDiscovery_PartialWorkerStartFailure_IgnoreChannelErrors ensures that when
+// some DC workers fail to start and ignoreChannelErrors is true, the remaining
+// workers continue.
+func TestDCDiscovery_PartialWorkerStartFailure_IgnoreChannelErrors(t *testing.T) {
+	core, logs := observer.New(zap.WarnLevel)
+	logger := zap.New(core)
+
+	callCount := 0
+	originalEvtSubscribe := evtSubscribe
+	evtSubscribe = func(_ uintptr, _ windows.Handle, _, _ *uint16, _, _, _ uintptr, _ uint32) (uintptr, error) {
+		callCount++
+		// Fail the second subscription (dc2)
+		if callCount == 2 {
+			return 0, windows.ERROR_EVT_CHANNEL_NOT_FOUND
+		}
+		return 42, nil
+	}
+
+	originalEvtClose := evtClose
+	evtClose = func(_ uintptr) error { return nil }
+
+	t.Cleanup(func() {
+		evtSubscribe = originalEvtSubscribe // runs SECOND
+		evtClose = originalEvtClose
+	})
+
+	originalGetDCs := getJoinedDomainControllersRemoteConfig
+	defer func() { getJoinedDomainControllersRemoteConfig = originalGetDCs }()
+	getJoinedDomainControllersRemoteConfig = func(_ *zap.Logger, username, password string) ([]RemoteConfig, error) {
+		return []RemoteConfig{
+			{Server: "dc1.example.com", Username: username, Password: password},
+			{Server: "dc2.example.com", Username: username, Password: password},
+			{Server: "dc3.example.com", Username: username, Password: password},
+		}, nil
+	}
+
+	persister := testutil.NewMockPersister("")
+	input := newTestInputWithLogger(logger)
+	input.startRemoteSession = func(_ *SingleInputWorker) error { return nil }
+	input.channel = "Security"
+	input.startAt = "end"
+	input.pollInterval = 1 * time.Second
+	input.discoverDomainControllers = true
+	input.ignoreChannelErrors = true
+	input.remote = RemoteConfig{
+		Server:   "configured-server",
+		Username: "admin",
+		Password: "secret",
+	}
+
+	err := input.Start(persister)
+	require.NoError(t, err, "Should not error when ignoreChannelErrors is true")
+	t.Cleanup(func() { require.NoError(t, input.Stop()) })
+
+	input.workersMu.RLock()
+	defer input.workersMu.RUnlock()
+
+	// dc1 succeeds, dc2 fails, dc3 succeeds, configured-server succeeds = 3 workers
+	assert.Len(t, input.workers, 3)
+	assert.Contains(t, input.workers, "dc1.example.com_Security")
+	assert.NotContains(t, input.workers, "dc2.example.com_Security")
+	assert.Contains(t, input.workers, "dc3.example.com_Security")
+	assert.Contains(t, input.workers, "configured-server_Security")
+
+	// Verify warning was logged for dc2
+	foundWarn := false
+	for _, log := range logs.All() {
+		if log.Level == zap.WarnLevel && containsString(log.Message, "Failed to start worker") {
+			foundWarn = true
+			break
+		}
+	}
+	assert.True(t, foundWarn, "Expected warning log for failed dc2 worker")
+}
+
+// TestDCDiscovery_AllWorkersFail_IgnoreChannelErrors ensures that if ALL workers
+// (discovered + configured) fail but ignoreChannelErrors is true, Start() succeeds
+// with zero workers.
+func TestDCDiscovery_AllWorkersFail_IgnoreChannelErrors(t *testing.T) {
+	originalEvtSubscribe := evtSubscribe
+	originalEvtClose := evtClose
+	evtClose = func(_ uintptr) error { return nil }
+	evtSubscribe = func(_ uintptr, _ windows.Handle, _, _ *uint16, _, _, _ uintptr, _ uint32) (uintptr, error) {
+		return 0, windows.ERROR_EVT_CHANNEL_NOT_FOUND
+	}
+
+	t.Cleanup(func() {
+		evtSubscribe = originalEvtSubscribe // runs SECOND
+		evtClose = originalEvtClose
+	})
+
+	originalGetDCs := getJoinedDomainControllersRemoteConfig
+	defer func() { getJoinedDomainControllersRemoteConfig = originalGetDCs }()
+	getJoinedDomainControllersRemoteConfig = func(_ *zap.Logger, username, password string) ([]RemoteConfig, error) {
+		return []RemoteConfig{
+			{Server: "dc1.example.com", Username: username, Password: password},
+		}, nil
+	}
+
+	persister := testutil.NewMockPersister("")
+	input := newTestInput()
+	input.startRemoteSession = func(_ *SingleInputWorker) error { return nil }
+	input.channel = "Security"
+	input.startAt = "end"
+	input.pollInterval = 1 * time.Second
+	input.discoverDomainControllers = true
+	input.ignoreChannelErrors = true
+	input.remote = RemoteConfig{
+		Server:   "configured-server",
+		Username: "admin",
+		Password: "secret",
+	}
+
+	err := input.Start(persister)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, input.Stop()) })
+
+	input.workersMu.RLock()
+	defer input.workersMu.RUnlock()
+	assert.Len(t, input.workers, 0, "All workers failed, should have zero workers")
+}
+
+// TestDCDiscovery_DuplicateServer_Deduplication tests that if a discovered DC has
+// the same server name as the configured server, both workers are created
+// (the worker key normalization may cause the second to overwrite the first).
+func TestDCDiscovery_DuplicateServer_NoOverwritesInWorkerMap(t *testing.T) {
+	originalEvtSubscribe := evtSubscribe
+	originalEvtClose := evtClose
+
+	evtSubscribe = func(_ uintptr, _ windows.Handle, _, _ *uint16, _, _, _ uintptr, _ uint32) (uintptr, error) {
+		return 42, nil
+	}
+	evtClose = func(_ uintptr) error { return nil }
+
+	t.Cleanup(func() {
+		evtSubscribe = originalEvtSubscribe // runs SECOND
+		evtClose = originalEvtClose
+	})
+
+	originalGetDCs := getJoinedDomainControllersRemoteConfig
+	defer func() { getJoinedDomainControllersRemoteConfig = originalGetDCs }()
+	getJoinedDomainControllersRemoteConfig = func(_ *zap.Logger, username, password string) ([]RemoteConfig, error) {
+		return []RemoteConfig{
+			// Same server as configured, but discovered via LDAP
+			{Server: "configured-server", Username: username, Password: password},
+		}, nil
+	}
+
+	persister := testutil.NewMockPersister("")
+	input := newTestInput()
+	input.startRemoteSession = func(_ *SingleInputWorker) error { return nil }
+	input.channel = "Application"
+	input.startAt = "end"
+	input.pollInterval = 1 * time.Second
+	input.discoverDomainControllers = true
+	input.remote = RemoteConfig{
+		Server:   "configured-server",
+		Username: "admin",
+		Password: "secret",
+	}
+
+	err := input.Start(persister)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, input.Stop()) })
+
+	input.workersMu.RLock()
+	defer input.workersMu.RUnlock()
+
+	// Both map to "configured-server" key; the last one registered wins
+	assert.Len(t, input.workers, 2)
+	assert.Contains(t, input.workers, "configured-server_Application")
+	assert.Contains(t, input.workers, "configured-server_Security")
+}
+
+// TestDCDiscovery_StopCleansUpAllWorkers ensures that Stop() properly cleans up
+// all workers including discovered DC workers.
+func TestDCDiscovery_StopCleansUpAllWorkers(t *testing.T) {
+	originalEvtSubscribe := evtSubscribe
+	originalEvtClose := evtClose
+	evtSubscribe = func(_ uintptr, _ windows.Handle, _, _ *uint16, _, _, _ uintptr, _ uint32) (uintptr, error) {
+		return 42, nil
+	}
+
+	t.Cleanup(func() {
+		evtSubscribe = originalEvtSubscribe // runs SECOND
+		evtClose = originalEvtClose
+	})
+
+	closedHandles := make(map[uintptr]bool)
+	evtClose = func(h uintptr) error {
+		closedHandles[h] = true
+		return nil
+	}
+
+	originalGetDCs := getJoinedDomainControllersRemoteConfig
+	defer func() { getJoinedDomainControllersRemoteConfig = originalGetDCs }()
+	getJoinedDomainControllersRemoteConfig = func(_ *zap.Logger, username, password string) ([]RemoteConfig, error) {
+		return []RemoteConfig{
+			{Server: "dc1.example.com", Username: username, Password: password},
+			{Server: "dc2.example.com", Username: username, Password: password},
+		}, nil
+	}
+
+	persister := testutil.NewMockPersister("")
+	input := newTestInput()
+	input.startRemoteSession = func(_ *SingleInputWorker) error { return nil }
+	input.channel = "Security"
+	input.startAt = "end"
+	input.pollInterval = 1 * time.Second
+	input.discoverDomainControllers = true
+	input.remote = RemoteConfig{
+		Server:   "configured-server",
+		Username: "admin",
+		Password: "secret",
+	}
+
+	err := input.Start(persister)
+	require.NoError(t, err)
+
+	// Verify workers were created
+	input.workersMu.RLock()
+	assert.Len(t, input.workers, 3)
+	input.workersMu.RUnlock()
+
+	// Stop should clean up all workers
+	err = input.Stop()
+	require.NoError(t, err)
+
+	input.workersMu.RLock()
+	defer input.workersMu.RUnlock()
+	assert.Len(t, input.workers, 0, "All workers should be removed after Stop()")
+}
+
+// TestDCDiscovery_PersistKeyUniqueness verifies that each worker gets a unique
+// persist key so bookmarks don't collide.
+func TestDCDiscovery_PersistKeyUniqueness(t *testing.T) {
+	w1 := &SingleInputWorker{
+		remote:  RemoteConfig{Server: "dc1.example.com"},
+		channel: "Security",
+	}
+	w2 := &SingleInputWorker{
+		remote:  RemoteConfig{Server: "dc2.example.com"},
+		channel: "Security",
+	}
+	wLocal := &SingleInputWorker{
+		remote:  RemoteConfig{Server: ""},
+		channel: "Security",
+	}
+	wConfigured := &SingleInputWorker{
+		remote:  RemoteConfig{Server: "configured-server"},
+		channel: "Application",
+	}
+
+	key1 := w1.getPersistKey()
+	key2 := w2.getPersistKey()
+	keyLocal := wLocal.getPersistKey()
+	keyConfigured := wConfigured.getPersistKey()
+
+	// All keys should be unique
+	keys := map[string]bool{}
+	for _, k := range []string{key1, key2, keyLocal, keyConfigured} {
+		assert.False(t, keys[k], "Duplicate persist key: %s", k)
+		keys[k] = true
+	}
+
+	// Remote keys should have the "remote::" prefix
+	assert.Contains(t, key1, "remote::dc1.example.com")
+	assert.Contains(t, key2, "remote::dc2.example.com")
+	assert.Contains(t, keyConfigured, "remote::configured-server")
+
+	// Local key should not have remote prefix
+	assert.Equal(t, "Security", keyLocal)
+}
+
+// containsString is a helper to check if a string contains a substring.
+func containsString(s, substr string) bool {
+	return len(s) >= len(substr) && searchString(s, substr)
+}
+
+func searchString(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }

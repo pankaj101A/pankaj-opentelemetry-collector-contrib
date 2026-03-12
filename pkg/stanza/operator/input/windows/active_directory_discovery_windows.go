@@ -234,7 +234,7 @@ func dnToHostname(dn string) string {
 	return strings.Join(labels, ".")
 }
 
-func getJoinedDomainControllersRemoteConfig(logger *zap.Logger, username, password string) ([]RemoteConfig, error) {
+var getJoinedDomainControllersRemoteConfig = func(logger *zap.Logger, username, password string) ([]RemoteConfig, error) {
 	var domainControllerConfigs []RemoteConfig
 	domain, domainControllers, err := discoverDomainControllersForJoinedDomain(logger)
 	if err != nil {
