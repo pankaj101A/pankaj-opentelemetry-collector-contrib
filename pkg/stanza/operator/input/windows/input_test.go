@@ -528,12 +528,6 @@ func TestInputRead_Batching(t *testing.T) {
 // The actual override requires replacing getJoinedDomainControllersRemoteConfig at the package level.
 // We use a variable-based approach consistent with how evtSubscribe is mocked.
 
-var originalGetJoinedDomainControllersRemoteConfig = getJoinedDomainControllersRemoteConfig
-
-func restoreGetJoinedDomainControllers() {
-	getJoinedDomainControllersRemoteConfig = originalGetJoinedDomainControllersRemoteConfig
-}
-
 // TestDCDiscovery_FlagDisabledByDefault ensures discover_domain_controllers defaults to false.
 func TestDCDiscovery_FlagDisabledByDefault(t *testing.T) {
 	cfg := NewConfig()
@@ -905,7 +899,7 @@ func TestDCDiscovery_AllWorkersFail_IgnoreChannelErrors(t *testing.T) {
 
 	input.workersMu.RLock()
 	defer input.workersMu.RUnlock()
-	assert.Len(t, input.workers, 0, "All workers failed, should have zero workers")
+	assert.Empty(t, input.workers, "All workers failed, should have zero workers")
 }
 
 // TestDCDiscovery_DuplicateServer_Deduplication tests that if a discovered DC has
@@ -1016,7 +1010,7 @@ func TestDCDiscovery_StopCleansUpAllWorkers(t *testing.T) {
 
 	input.workersMu.RLock()
 	defer input.workersMu.RUnlock()
-	assert.Len(t, input.workers, 0, "All workers should be removed after Stop()")
+	assert.Empty(t, input.workers, "All workers should be removed after Stop()")
 }
 
 // TestDCDiscovery_PersistKeyUniqueness verifies that each worker gets a unique
