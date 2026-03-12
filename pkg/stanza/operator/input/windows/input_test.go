@@ -71,7 +71,7 @@ func TestInputStart_RemoteSubscriptionError(t *testing.T) {
 	persister := testutil.NewMockPersister("")
 
 	input := newTestInput()
-	input.startRemoteSession = func() error { return nil }
+	input.startRemoteSession = func(_ *SingleInputWorker) error { return nil }
 	input.channel = "test-channel"
 	input.startAt = "beginning"
 	input.pollInterval = 1 * time.Second
@@ -88,7 +88,7 @@ func TestInputStart_RemoteSessionError(t *testing.T) {
 	persister := testutil.NewMockPersister("")
 
 	input := newTestInput()
-	input.startRemoteSession = func() error {
+	input.startRemoteSession = func(_ *SingleInputWorker) error {
 		return errors.New("remote session error")
 	}
 	input.channel = "test-channel"
@@ -114,7 +114,7 @@ func TestInputStart_RemoteAccessDeniedError(t *testing.T) {
 	}
 
 	input := newTestInput()
-	input.startRemoteSession = func() error { return nil }
+	input.startRemoteSession = func(_ *SingleInputWorker) error { return nil }
 	input.channel = "test-channel"
 	input.startAt = "beginning"
 	input.pollInterval = 1 * time.Second
@@ -139,7 +139,7 @@ func TestInputStart_BadChannelName(t *testing.T) {
 	}
 
 	input := newTestInput()
-	input.startRemoteSession = func() error { return nil }
+	input.startRemoteSession = func(_ *SingleInputWorker) error { return nil }
 	input.channel = "bad-channel"
 	input.startAt = "beginning"
 	input.pollInterval = 1 * time.Second
@@ -236,10 +236,11 @@ func TestInputRead_RPCInvalidBound(t *testing.T) {
 	logger := zap.New(core)
 
 	// Create input instance with mocked dependencies
-	input := newInput(component.TelemetrySettings{
+	input := &newInput(component.TelemetrySettings{
 		Logger: logger,
-	})
+	}).SingleInputWorker
 
+	input.logger = logger
 	// Set up test values
 	input.maxReads = 100
 	input.currentMaxReads = 100
@@ -471,9 +472,9 @@ func TestInputRead_Batching(t *testing.T) {
 		return nil
 	}
 
-	input := newTestInput()
+	input := newWorker(RemoteConfig{}, "test-channel", nil, newTestInput())
 
-	input.processEvent = func(_ context.Context, _ Event) error {
+	input.processEvent = func(_ context.Context, _ Event, _ RemoteConfig) error {
 		processedEvents++
 		return nil
 	}

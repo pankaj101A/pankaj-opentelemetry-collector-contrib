@@ -62,12 +62,12 @@ func (c *Config) Build(set component.TelemetrySettings) (operator.Operator, erro
 		query:                     c.Query,
 		discoverDomainControllers: c.DiscoverDomainControllers,
 	}
-	input.startRemoteSession = input.defaultStartRemoteSession
+	input.startRemoteSession = defaultStartRemoteSession
 
 	if c.SuppressRenderingInfo {
-		input.processEvent = input.processEventWithoutRenderingInfo
+		input.processEvent = input.processEventWithoutRenderingInfoCustomRemote
 	} else {
-		input.processEvent = input.processEventWithRenderingInfo
+		input.processEvent = input.processEventWithRenderingInfoCustomRemote
 	}
 
 	return input, nil

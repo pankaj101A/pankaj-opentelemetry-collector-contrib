@@ -42,11 +42,7 @@ type Input struct {
 	cancel                   context.CancelFunc
 	subscription             Subscription
 	maxEventsPerPollCycle    int
-	eventsReadInPollCycle    int
 	remote                   RemoteConfig
-	remoteSessionHandle      windows.Handle
-	startRemoteSession       func() error
-	processEvent             func(context.Context, Event) error
 
 	discoverDomainControllers bool
 
@@ -67,11 +63,11 @@ func newInput(settings component.TelemetrySettings) *Input {
 			},
 		},
 	}
-	input.startRemoteSession = input.defaultStartRemoteSession
+	input.startRemoteSession = defaultStartRemoteSession
 	return input
 }
 
-func (i *Input) newWorker(remote RemoteConfig, channel string, query *string) *SingleInputWorker {
+func newWorker(remote RemoteConfig, channel string, query *string, i *Input) *SingleInputWorker {
 	w := &SingleInputWorker{
 		remote:                remote,
 		channel:               channel,
@@ -87,36 +83,11 @@ func (i *Input) newWorker(remote RemoteConfig, channel string, query *string) *S
 		persister:             i.persister,
 		logger:                i.Logger().With(zap.String("worker-server", remote.Server)),
 		ignoreChannelErrors:   i.ignoreChannelErrors,
-	}
-	if i.raw {
-		w.processEvent = i.processEventWithoutRenderingInfoCustomRemote
-	} else {
-		w.processEvent = i.processEventWithRenderingInfoCustomRemote
+		startRemoteSession:    i.startRemoteSession,
+		subscription:          i.subscription,
+		processEvent:          i.processEvent,
 	}
 	return w
-}
-
-// defaultStartRemoteSession starts a remote session for reading event logs from a remote server.
-func (i *Input) defaultStartRemoteSession() error {
-	if i.remote.Server == "" {
-		return nil
-	}
-
-	login := EvtRPCLogin{
-		Server:   windows.StringToUTF16Ptr(i.remote.Server),
-		User:     windows.StringToUTF16Ptr(i.remote.Username),
-		Password: windows.StringToUTF16Ptr(i.remote.Password),
-	}
-	if i.remote.Domain != "" {
-		login.Domain = windows.StringToUTF16Ptr(i.remote.Domain)
-	}
-
-	sessionHandle, err := evtOpenSession(EvtRPCLoginClass, &login, 0, 0)
-	if err != nil {
-		return fmt.Errorf("failed to open session for server %s: %w", i.remote.Server, err)
-	}
-	i.remoteSessionHandle = sessionHandle
-	return nil
 }
 
 // isRemote checks if the input is configured for remote access.
@@ -145,7 +116,7 @@ func (i *Input) Start(persister operator.Persister) error {
 			} else {
 				for _, dc := range domainControllers {
 					i.Logger().Info("Discovered domain controller for remote server", zap.String("server", i.remote.Server), zap.String("domain_controller", dc.Server))
-					workersList = append(workersList, i.newWorker(dc, "Security", nil))
+					workersList = append(workersList, newWorker(dc, "Security", nil, i))
 				}
 			}
 		}
@@ -159,7 +130,7 @@ func (i *Input) Start(persister operator.Persister) error {
 			Password: "",
 		}
 	}
-	workersList = append(workersList, i.newWorker(i.remote, i.channel, i.query))
+	workersList = append(workersList, newWorker(i.remote, i.channel, i.query, i))
 	i.publisherCache = newPublisherCache()
 	i.workers = make(map[string]*SingleInputWorker)
 
@@ -233,10 +204,6 @@ func (i *Input) renderDeepAndSend(ctx context.Context, event Event, publisher Pu
 	)
 }
 
-func (i *Input) processEventWithoutRenderingInfo(ctx context.Context, event Event) error {
-	return i.processEventWithoutRenderingInfoCustomRemote(ctx, event, i.remote)
-}
-
 // processEvent will process and send an event retrieved from windows event log.
 func (i *Input) processEventWithoutRenderingInfoCustomRemote(ctx context.Context, event Event, config RemoteConfig) error {
 	if len(i.excludeProviders) == 0 {
@@ -246,10 +213,6 @@ func (i *Input) processEventWithoutRenderingInfoCustomRemote(ctx context.Context
 		return nil
 	}
 	return i.renderSimpleAndSend(ctx, event, config)
-}
-
-func (i *Input) processEventWithRenderingInfo(ctx context.Context, event Event) error {
-	return i.processEventWithRenderingInfoCustomRemote(ctx, event, i.remote)
 }
 
 func (i *Input) processEventWithRenderingInfoCustomRemote(ctx context.Context, event Event, config RemoteConfig) error {
