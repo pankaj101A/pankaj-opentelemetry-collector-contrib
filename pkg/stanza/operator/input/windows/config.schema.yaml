@@ -5,6 +5,8 @@ $defs:
     properties:
       channel:
         type: string
+      discover_domain_controllers:
+        type: boolean
       exclude_providers:
         type: array
         items:
