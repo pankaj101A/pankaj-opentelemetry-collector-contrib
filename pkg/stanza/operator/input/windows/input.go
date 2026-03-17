@@ -34,6 +34,7 @@ type Input struct {
 	currentMaxReads          int
 	startAt                  string
 	raw                      bool
+	eventDataFormat          EventDataFormat
 	includeLogRecordOriginal bool
 	excludeProviders         map[string]struct{}
 	pollInterval             time.Duration
@@ -239,7 +240,7 @@ func (i *Input) processEventWithRenderingInfoCustomRemote(ctx context.Context, e
 func (i *Input) sendEvent(ctx context.Context, eventXML *EventXML, remote RemoteConfig) error {
 	var body any = eventXML.Original
 	if !i.raw {
-		body = formattedBody(eventXML)
+		body = formattedBody(eventXML, i.eventDataFormat)
 	}
 
 	e, err := i.NewEntry(body)
