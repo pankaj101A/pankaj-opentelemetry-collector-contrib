@@ -25,7 +25,7 @@ import (
 // Input is an operator that creates entries using the windows event log api.
 type Input struct {
 	helper.InputOperator
-	SingleInputWorker
+	singleInputWorker
 	buffer                   *Buffer
 	channel                  string
 	ignoreChannelErrors      bool
@@ -48,7 +48,7 @@ type Input struct {
 
 	// Worker registry
 	workersMu sync.RWMutex
-	workers   map[string]*SingleInputWorker // key: normalised server name
+	workers   map[string]*singleInputWorker // key: normalised server name
 }
 
 // newInput creates a new Input operator.
@@ -67,8 +67,8 @@ func newInput(settings component.TelemetrySettings) *Input {
 	return input
 }
 
-func newWorker(remote RemoteConfig, channel string, query *string, i *Input) *SingleInputWorker {
-	w := &SingleInputWorker{
+func newWorker(remote RemoteConfig, channel string, query *string, i *Input) *singleInputWorker {
+	w := &singleInputWorker{
 		remote:                remote,
 		channel:               channel,
 		query:                 query,
@@ -107,7 +107,7 @@ func (i *Input) Start(persister operator.Persister) error {
 
 	i.persister = persister
 
-	var workersList []*SingleInputWorker
+	var workersList []*singleInputWorker
 	if i.isRemote() {
 		if i.discoverDomainControllers {
 			domainControllers, err := getJoinedDomainControllersRemoteConfig(i.Logger(), i.remote.Username, i.remote.Password)
@@ -132,7 +132,7 @@ func (i *Input) Start(persister operator.Persister) error {
 	}
 	workersList = append(workersList, newWorker(i.remote, i.channel, i.query, i))
 	i.publisherCache = newPublisherCache()
-	i.workers = make(map[string]*SingleInputWorker)
+	i.workers = make(map[string]*singleInputWorker)
 
 	for _, w := range workersList {
 		if err := w.start(ctx); err != nil {

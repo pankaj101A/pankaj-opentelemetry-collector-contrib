@@ -8,7 +8,9 @@ package windows // import "github.com/open-telemetry/opentelemetry-collector-con
 import (
 	"errors"
 	"fmt"
+	"net"
 	"strings"
+	"time"
 
 	"github.com/alexbrainman/sspi"
 	"github.com/alexbrainman/sspi/ntlm"
@@ -17,15 +19,17 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// SSPINegotiator implements ldap.NTLMNegotiator using current user's SSPI credentials.
+// sspINegotiator implements ldap.NTLMNegotiator using current user's SSPI credentials.
 // This mirrors C++ ADsOpenObject(..., ADS_SECURE_AUTHENTICATION) with null username/password.
-type SSPINegotiator struct {
+type sspINegotiator struct {
 	creds *sspi.Credentials   // current user creds acquired from SSPI
 	ctx   *ntlm.ClientContext // NTLM client context for challenge/response
 }
 
+var _ ldap.NTLMNegotiator = (*sspINegotiator)(nil)
+
 // Acquire current logged-on user credentials no username/password needed
-func (n *SSPINegotiator) Negotiate(_, _ string) ([]byte, error) {
+func (n *sspINegotiator) Negotiate(_, _ string) ([]byte, error) {
 	creds, err := ntlm.AcquireCurrentUserCredentials()
 	if err != nil {
 		return nil, fmt.Errorf("failed to acquire current user SSPI credentials: %w", err)
@@ -42,7 +46,7 @@ func (n *SSPINegotiator) Negotiate(_, _ string) ([]byte, error) {
 	return negotiateMsg, nil
 }
 
-func (n *SSPINegotiator) ChallengeResponse(challenge []byte, _, _ string) ([]byte, error) {
+func (n *sspINegotiator) ChallengeResponse(challenge []byte, _, _ string) ([]byte, error) {
 	// Process Type 2 (Challenge) from server, produce Type 3 (Authenticate) message
 	authenticateMsg, err := n.ctx.Update(challenge)
 	if err != nil {
@@ -51,7 +55,7 @@ func (n *SSPINegotiator) ChallengeResponse(challenge []byte, _, _ string) ([]byt
 	return authenticateMsg, nil
 }
 
-func (n *SSPINegotiator) Release() {
+func (n *sspINegotiator) Release() {
 	if n.ctx != nil {
 		_ = n.ctx.Release()
 	}
@@ -60,10 +64,10 @@ func (n *SSPINegotiator) Release() {
 	}
 }
 
-// GetLDAPDomainPath discovers the root domain path of the Active Directory service.
+// getLDAPDomainPath discovers the root domain path of the Active Directory service.
 // It first tries querying the LDAP Root DSE, then falls back to the Windows API.
 // Returns a path like "LDAP://DC=example,DC=com".
-func GetLDAPDomainPath(logger *zap.Logger) (string, error) {
+func getLDAPDomainPath(logger *zap.Logger) (string, error) {
 	currentJoinedDomain, currentDomainError := getCurrentMachineJoinedDomain()
 	if currentDomainError != nil {
 		return "", fmt.Errorf("failed to get current machine joined domain: %w", currentDomainError)
@@ -84,7 +88,7 @@ func GetLDAPDomainPath(logger *zap.Logger) (string, error) {
 // getRootLDAPDomainPath connects to the current machine joined DC and reads
 // the defaultNamingContext attribute.
 func getRootLDAPDomainPath(domain string) (string, error) {
-	conn, err := ldap.DialURL("ldap://" + domain)
+	conn, err := ldap.DialURL("ldap://"+domain, ldap.DialWithDialer(&net.Dialer{Timeout: 20 * time.Second}))
 	if err != nil {
 		return "", fmt.Errorf("failed to connect to LDAP Root DSE: %w", err)
 	}
@@ -94,8 +98,8 @@ func getRootLDAPDomainPath(domain string) (string, error) {
 		"",                   // Base DN: empty string = Root DSE
 		ldap.ScopeBaseObject, // Only the root entry itself
 		ldap.NeverDerefAliases,
-		0,     // No size limit
-		0,     // No time limit
+		1,     // Size limit of 1 since we only expect one Root DSE entry
+		10,    // 10s time limit to avoid hanging if something is wrong with the server
 		false, // attrs only = false
 		"(objectClass=*)",
 		[]string{"defaultNamingContext"},
@@ -150,7 +154,7 @@ func getCurrentMachineJoinedDomain() (string, error) {
 }
 
 func discoverDomainControllersForJoinedDomain(logger *zap.Logger) (string, []string, error) {
-	domain, err := GetLDAPDomainPath(logger)
+	domain, err := getLDAPDomainPath(logger)
 	if err != nil {
 		return "", nil, err
 	}
@@ -164,7 +168,7 @@ func discoverDomainControllersForJoinedDomain(logger *zap.Logger) (string, []str
 }
 
 func getDomainControllersForDomain(domain string) ([]string, error) {
-	conn, err := ldap.DialURL("ldap://" + domain)
+	conn, err := ldap.DialURL("ldap://"+domain, ldap.DialWithDialer(&net.Dialer{Timeout: 10 * time.Second}))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to LDAP server %s: %w", domain, err)
 	}
@@ -172,7 +176,7 @@ func getDomainControllersForDomain(domain string) ([]string, error) {
 
 	domainDN := domainToDN(domain)
 
-	negotiator := &SSPINegotiator{}
+	negotiator := &sspINegotiator{}
 	defer negotiator.Release()
 
 	_, err = conn.NTLMChallengeBind(&ldap.NTLMBindRequest{
@@ -187,9 +191,9 @@ func getDomainControllersForDomain(domain string) ([]string, error) {
 		domainDN,
 		ldap.ScopeWholeSubtree,
 		ldap.NeverDerefAliases,
-		1000,  // Size limit, keeping 1000 for safety, though we expect far fewer DCs
-		0,     // Time limit (0 = unlimited)
-		false, // Types only
+		1000,                                                 // Size limit, keeping 1000 for safety, though we expect far fewer DCs
+		30,                                                   // Time limit of 30s to avoid hanging if something is wrong with the server
+		false,                                                // Types only
 		"(&(objectClass=computer)(primaryGroupID=516))",      // LDAP filter for DCs
 		[]string{"dNSHostName", "name", "distinguishedName"}, // Attributes to retrieve
 		nil,
@@ -215,11 +219,7 @@ func getDomainControllersForDomain(domain string) ([]string, error) {
 // Example: "example.com" -> "DC=example,DC=com"
 func domainToDN(domain string) string {
 	parts := strings.Split(domain, ".")
-	dnParts := make([]string, len(parts))
-	for i, part := range parts {
-		dnParts[i] = "DC=" + part
-	}
-	return strings.Join(dnParts, ",")
+	return "DC=" + strings.Join(parts, ",DC=")
 }
 
 func dnToHostname(dn string) string {
@@ -238,7 +238,7 @@ var getJoinedDomainControllersRemoteConfig = func(logger *zap.Logger, username, 
 	var domainControllerConfigs []RemoteConfig
 	domain, domainControllers, err := discoverDomainControllersForJoinedDomain(logger)
 	if err != nil {
-		return nil, errors.New("failed to discover domain controllers: " + err.Error())
+		return nil, fmt.Errorf("failed to discover domain controllers: %w", err)
 	}
 	if len(domainControllers) == 0 {
 		return nil, errors.New("no domain controllers found during discovery")

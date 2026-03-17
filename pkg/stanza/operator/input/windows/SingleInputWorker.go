@@ -20,7 +20,15 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza/operator"
 )
 
-type SingleInputWorker struct {
+// singleInputWorker
+// Implementation is to encapsulate all logic required to collect Windows Event Logs from a single source
+// — whether that source is the local machine or a remotely discovered Domain Controller (DC).
+// It provides an isolated, self‑contained worker that can be started, managed, and stopped by the higher‑level Input orchestrator.
+// It sends events to the parent Input operator via a callback, allowing the parent to remain stateless and focused on orchestration,
+// while the singleInputWorker handles all the complexities of interacting with the Windows Event Log API,
+// managing bookmarks, handling remote sessions, and implementing robust error handling and recovery logic.
+// ***
+type singleInputWorker struct {
 	// Identity
 	remote  RemoteConfig // empty Server = local
 	channel string
@@ -51,13 +59,13 @@ type SingleInputWorker struct {
 	wg                  sync.WaitGroup
 	logger              *zap.Logger
 	ignoreChannelErrors bool
-	startRemoteSession  func(worker *SingleInputWorker) error
+	startRemoteSession  func(worker *singleInputWorker) error
 
 	// Callback into parent (stateless, safe to share)
 	processEvent func(context.Context, Event, RemoteConfig) error
 }
 
-func (siw *SingleInputWorker) start(ctx context.Context) error {
+func (siw *singleInputWorker) start(ctx context.Context) error {
 	// 1. Open RPC session (no-op for local)
 	if siw.isRemote() {
 		if err := siw.startRemoteSession(siw); err != nil {
@@ -104,7 +112,7 @@ func (siw *SingleInputWorker) start(ctx context.Context) error {
 	return nil
 }
 
-func (siw *SingleInputWorker) stop() error {
+func (siw *singleInputWorker) stop() error {
 	if siw.cancel != nil {
 		siw.cancel()
 	}
@@ -125,7 +133,7 @@ func (siw *SingleInputWorker) stop() error {
 	return multierr.Append(errs, siw.stopSession())
 }
 
-func defaultStartRemoteSession(siw *SingleInputWorker) error {
+func defaultStartRemoteSession(siw *singleInputWorker) error {
 	// remote session is only needed if Server is specified; otherwise we stay local and sessionHandle remains 0
 	if siw.remote.Server == "" {
 		return nil
@@ -146,7 +154,7 @@ func defaultStartRemoteSession(siw *SingleInputWorker) error {
 	return nil
 }
 
-func (siw *SingleInputWorker) stopSession() error {
+func (siw *singleInputWorker) stopSession() error {
 	if siw.sessionHandle == 0 {
 		return nil
 	}
@@ -157,7 +165,7 @@ func (siw *SingleInputWorker) stopSession() error {
 	return nil
 }
 
-func (siw *SingleInputWorker) pollAndRead(ctx context.Context) {
+func (siw *singleInputWorker) pollAndRead(ctx context.Context) {
 	defer siw.wg.Done()
 	for {
 		siw.eventsReadInPollCycle = 0
@@ -170,7 +178,7 @@ func (siw *SingleInputWorker) pollAndRead(ctx context.Context) {
 	}
 }
 
-func (siw *SingleInputWorker) read(ctx context.Context) {
+func (siw *singleInputWorker) read(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -183,7 +191,7 @@ func (siw *SingleInputWorker) read(ctx context.Context) {
 	}
 }
 
-func (siw *SingleInputWorker) readBatch(ctx context.Context) bool {
+func (siw *singleInputWorker) readBatch(ctx context.Context) bool {
 	maxBatchSize := siw.getCurrentBatchSize()
 	if maxBatchSize <= 0 {
 		return false
@@ -242,7 +250,7 @@ func (siw *SingleInputWorker) readBatch(ctx context.Context) bool {
 	return len(events) != 0
 }
 
-func (siw *SingleInputWorker) updateBookmarkOffset(ctx context.Context, event Event) {
+func (siw *singleInputWorker) updateBookmarkOffset(ctx context.Context, event Event) {
 	if err := siw.bookmark.Update(event); err != nil {
 		siw.logger.Error("Failed to update bookmark from event", zap.Error(err), zap.String("server", siw.remote.Server))
 		return
@@ -260,7 +268,7 @@ func (siw *SingleInputWorker) updateBookmarkOffset(ctx context.Context, event Ev
 	}
 }
 
-func (siw *SingleInputWorker) loadBookmark(ctx context.Context) (string, error) {
+func (siw *singleInputWorker) loadBookmark(ctx context.Context) (string, error) {
 	key := siw.getPersistKey()
 	bytes, err := siw.persister.Get(ctx, key)
 	if err != nil {
@@ -280,7 +288,7 @@ func (siw *SingleInputWorker) loadBookmark(ctx context.Context) (string, error) 
 	return offsetXML, nil
 }
 
-func (siw *SingleInputWorker) getPersistKey() string {
+func (siw *singleInputWorker) getPersistKey() string {
 	var base string
 	if siw.query != nil {
 		base = *siw.query
@@ -297,24 +305,24 @@ func (siw *SingleInputWorker) getPersistKey() string {
 }
 
 // isRemote checks if the input is configured for remote access.
-func (siw *SingleInputWorker) isRemote() bool {
+func (siw *singleInputWorker) isRemote() bool {
 	return siw.remote.Server != ""
 }
 
-func (siw *SingleInputWorker) getCurrentBatchSize() int {
+func (siw *singleInputWorker) getCurrentBatchSize() int {
 	if siw.maxEventsPerPollCycle == 0 {
 		return siw.currentMaxReads
 	}
 	return min(siw.currentMaxReads, siw.maxEventsPerPollCycle-siw.eventsReadInPollCycle)
 }
 
-func (siw *SingleInputWorker) initSubscription() Subscription {
+func (siw *singleInputWorker) initSubscription() Subscription {
 	if siw.isRemote() {
 		return NewRemoteSubscription(siw.remote.Server)
 	}
 	return NewLocalSubscription()
 }
 
-func workerKey(worker *SingleInputWorker) string {
+func workerKey(worker *singleInputWorker) string {
 	return fmt.Sprintf("%s_%s", strings.ToLower(strings.TrimSpace(worker.remote.Server)), worker.channel)
 }

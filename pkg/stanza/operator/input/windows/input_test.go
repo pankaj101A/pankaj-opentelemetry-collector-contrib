@@ -77,7 +77,7 @@ func TestInputStart_RemoteSubscriptionError(t *testing.T) {
 	persister := testutil.NewMockPersister("")
 
 	input := newTestInput()
-	input.startRemoteSession = func(_ *SingleInputWorker) error { return nil }
+	input.startRemoteSession = func(_ *singleInputWorker) error { return nil }
 	input.channel = "test-channel"
 	input.startAt = "beginning"
 	input.pollInterval = 1 * time.Second
@@ -94,7 +94,7 @@ func TestInputStart_RemoteSessionError(t *testing.T) {
 	persister := testutil.NewMockPersister("")
 
 	input := newTestInput()
-	input.startRemoteSession = func(_ *SingleInputWorker) error {
+	input.startRemoteSession = func(_ *singleInputWorker) error {
 		return errors.New("remote session error")
 	}
 	input.channel = "test-channel"
@@ -120,7 +120,7 @@ func TestInputStart_RemoteAccessDeniedError(t *testing.T) {
 	}
 
 	input := newTestInput()
-	input.startRemoteSession = func(_ *SingleInputWorker) error { return nil }
+	input.startRemoteSession = func(_ *singleInputWorker) error { return nil }
 	input.channel = "test-channel"
 	input.startAt = "beginning"
 	input.pollInterval = 1 * time.Second
@@ -145,7 +145,7 @@ func TestInputStart_BadChannelName(t *testing.T) {
 	}
 
 	input := newTestInput()
-	input.startRemoteSession = func(_ *SingleInputWorker) error { return nil }
+	input.startRemoteSession = func(_ *singleInputWorker) error { return nil }
 	input.channel = "bad-channel"
 	input.startAt = "beginning"
 	input.pollInterval = 1 * time.Second
@@ -244,7 +244,7 @@ func TestInputRead_RPCInvalidBound(t *testing.T) {
 	// Create input instance with mocked dependencies
 	input := &newInput(component.TelemetrySettings{
 		Logger: logger,
-	}).SingleInputWorker
+	}).singleInputWorker
 
 	input.logger = logger
 	// Set up test values
@@ -589,7 +589,7 @@ func TestDCDiscovery_RemoteEnabled(t *testing.T) {
 
 	persister := testutil.NewMockPersister("")
 	input := newTestInput()
-	input.startRemoteSession = func(_ *SingleInputWorker) error { return nil }
+	input.startRemoteSession = func(_ *singleInputWorker) error { return nil }
 	input.channel = "Security"
 	input.startAt = "end"
 	input.pollInterval = 1 * time.Second
@@ -640,7 +640,7 @@ func TestDCDiscovery_DiscoverySucceeds_AllWorkersStarted(t *testing.T) {
 
 	persister := testutil.NewMockPersister("")
 	input := newTestInput()
-	input.startRemoteSession = func(_ *SingleInputWorker) error { return nil }
+	input.startRemoteSession = func(_ *singleInputWorker) error { return nil }
 	input.channel = "Application"
 	input.startAt = "end"
 	input.pollInterval = 1 * time.Second
@@ -689,13 +689,13 @@ func TestDCDiscovery_DiscoverySucceeds_DCWorkersUseSecurityChannel(t *testing.T)
 		}, nil
 	}
 
-	var capturedWorkers []*SingleInputWorker
+	var capturedWorkers []*singleInputWorker
 	originalNewWorker := newWorker
 	_ = originalNewWorker // newWorker is a package-level func, capture via startRemoteSession
 
 	persister := testutil.NewMockPersister("")
 	input := newTestInput()
-	input.startRemoteSession = func(w *SingleInputWorker) error {
+	input.startRemoteSession = func(w *singleInputWorker) error {
 		capturedWorkers = append(capturedWorkers, w)
 		return nil
 	}
@@ -716,7 +716,7 @@ func TestDCDiscovery_DiscoverySucceeds_DCWorkersUseSecurityChannel(t *testing.T)
 	t.Cleanup(func() { require.NoError(t, input.Stop()) })
 
 	// Find the DC worker and the configured worker
-	var dcWorker, configuredWorker *SingleInputWorker
+	var dcWorker, configuredWorker *singleInputWorker
 	for _, w := range capturedWorkers {
 		if w.remote.Server == "dc1.example.com" {
 			dcWorker = w
@@ -759,7 +759,7 @@ func TestDCDiscovery_DiscoveryReturnsNil_OnlyConfiguredServerStarts(t *testing.T
 
 	persister := testutil.NewMockPersister("")
 	input := newTestInput()
-	input.startRemoteSession = func(_ *SingleInputWorker) error { return nil }
+	input.startRemoteSession = func(_ *singleInputWorker) error { return nil }
 	input.channel = "Security"
 	input.startAt = "end"
 	input.pollInterval = 1 * time.Second
@@ -818,7 +818,7 @@ func TestDCDiscovery_PartialWorkerStartFailure_IgnoreChannelErrors(t *testing.T)
 
 	persister := testutil.NewMockPersister("")
 	input := newTestInputWithLogger(logger)
-	input.startRemoteSession = func(_ *SingleInputWorker) error { return nil }
+	input.startRemoteSession = func(_ *singleInputWorker) error { return nil }
 	input.channel = "Security"
 	input.startAt = "end"
 	input.pollInterval = 1 * time.Second
@@ -881,7 +881,7 @@ func TestDCDiscovery_AllWorkersFail_IgnoreChannelErrors(t *testing.T) {
 
 	persister := testutil.NewMockPersister("")
 	input := newTestInput()
-	input.startRemoteSession = func(_ *SingleInputWorker) error { return nil }
+	input.startRemoteSession = func(_ *singleInputWorker) error { return nil }
 	input.channel = "Security"
 	input.startAt = "end"
 	input.pollInterval = 1 * time.Second
@@ -930,7 +930,7 @@ func TestDCDiscovery_DuplicateServer_NoOverwritesInWorkerMap(t *testing.T) {
 
 	persister := testutil.NewMockPersister("")
 	input := newTestInput()
-	input.startRemoteSession = func(_ *SingleInputWorker) error { return nil }
+	input.startRemoteSession = func(_ *singleInputWorker) error { return nil }
 	input.channel = "Application"
 	input.startAt = "end"
 	input.pollInterval = 1 * time.Second
@@ -985,7 +985,7 @@ func TestDCDiscovery_StopCleansUpAllWorkers(t *testing.T) {
 
 	persister := testutil.NewMockPersister("")
 	input := newTestInput()
-	input.startRemoteSession = func(_ *SingleInputWorker) error { return nil }
+	input.startRemoteSession = func(_ *singleInputWorker) error { return nil }
 	input.channel = "Security"
 	input.startAt = "end"
 	input.pollInterval = 1 * time.Second
@@ -1016,19 +1016,19 @@ func TestDCDiscovery_StopCleansUpAllWorkers(t *testing.T) {
 // TestDCDiscovery_PersistKeyUniqueness verifies that each worker gets a unique
 // persist key so bookmarks don't collide.
 func TestDCDiscovery_PersistKeyUniqueness(t *testing.T) {
-	w1 := &SingleInputWorker{
+	w1 := &singleInputWorker{
 		remote:  RemoteConfig{Server: "dc1.example.com"},
 		channel: "Security",
 	}
-	w2 := &SingleInputWorker{
+	w2 := &singleInputWorker{
 		remote:  RemoteConfig{Server: "dc2.example.com"},
 		channel: "Security",
 	}
-	wLocal := &SingleInputWorker{
+	wLocal := &singleInputWorker{
 		remote:  RemoteConfig{Server: ""},
 		channel: "Security",
 	}
-	wConfigured := &SingleInputWorker{
+	wConfigured := &singleInputWorker{
 		remote:  RemoteConfig{Server: "configured-server"},
 		channel: "Application",
 	}
