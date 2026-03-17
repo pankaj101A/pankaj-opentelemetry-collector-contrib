@@ -191,9 +191,9 @@ func getDomainControllersForDomain(domain string) ([]string, error) {
 		domainDN,
 		ldap.ScopeWholeSubtree,
 		ldap.NeverDerefAliases,
-		1000,                                                 // Size limit, keeping 1000 for safety, though we expect far fewer DCs
-		30,                                                   // Time limit of 30s to avoid hanging if something is wrong with the server
-		false,                                                // Types only
+		1000,  // Size limit, keeping 1000 for safety, though we expect far fewer DCs
+		30,    // Time limit of 30s to avoid hanging if something is wrong with the server
+		false, // Types only
 		"(&(objectClass=computer)(primaryGroupID=516))",      // LDAP filter for DCs
 		[]string{"dNSHostName", "name", "distinguishedName"}, // Attributes to retrieve
 		nil,

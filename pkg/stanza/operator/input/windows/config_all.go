@@ -42,21 +42,21 @@ func NewConfigWithID(operatorID string) *Config {
 
 // Config is the configuration of a windows event log operator.
 type Config struct {
-	helper.InputConfig       `mapstructure:",squash"`
-	Channel                  string          `mapstructure:"channel"`
-	IgnoreChannelErrors      bool            `mapstructure:"ignore_channel_errors,omitempty"`
-	MaxReads                 int             `mapstructure:"max_reads,omitempty"`
-	StartAt                  string          `mapstructure:"start_at,omitempty"`
-	PollInterval             time.Duration   `mapstructure:"poll_interval,omitempty"`
-	MaxEventsPerPoll         int             `mapstructure:"max_events_per_poll,omitempty"`
-	Raw                      bool            `mapstructure:"raw,omitempty"`
-	EventDataFormat          EventDataFormat `mapstructure:"event_data_format,omitempty"`
-	IncludeLogRecordOriginal bool            `mapstructure:"include_log_record_original,omitempty"`
-	SuppressRenderingInfo    bool            `mapstructure:"suppress_rendering_info,omitempty"`
-	ExcludeProviders         []string        `mapstructure:"exclude_providers,omitempty"`
-	Remote                   RemoteConfig    `mapstructure:"remote,omitempty"`
-	Query                    *string         `mapstructure:"query,omitempty"`
-  DiscoverDomainControllers bool          `mapstructure:"discover_domain_controllers,omitempty"`
+	helper.InputConfig        `mapstructure:",squash"`
+	Channel                   string          `mapstructure:"channel"`
+	IgnoreChannelErrors       bool            `mapstructure:"ignore_channel_errors,omitempty"`
+	MaxReads                  int             `mapstructure:"max_reads,omitempty"`
+	StartAt                   string          `mapstructure:"start_at,omitempty"`
+	PollInterval              time.Duration   `mapstructure:"poll_interval,omitempty"`
+	MaxEventsPerPoll          int             `mapstructure:"max_events_per_poll,omitempty"`
+	Raw                       bool            `mapstructure:"raw,omitempty"`
+	EventDataFormat           EventDataFormat `mapstructure:"event_data_format,omitempty"`
+	IncludeLogRecordOriginal  bool            `mapstructure:"include_log_record_original,omitempty"`
+	SuppressRenderingInfo     bool            `mapstructure:"suppress_rendering_info,omitempty"`
+	ExcludeProviders          []string        `mapstructure:"exclude_providers,omitempty"`
+	Remote                    RemoteConfig    `mapstructure:"remote,omitempty"`
+	Query                     *string         `mapstructure:"query,omitempty"`
+	DiscoverDomainControllers bool            `mapstructure:"discover_domain_controllers,omitempty"`
 }
 
 // RemoteConfig is the configuration for a remote server.
