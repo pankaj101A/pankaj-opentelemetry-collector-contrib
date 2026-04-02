@@ -13,11 +13,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza/internal/metadata"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"golang.org/x/sys/windows"
 
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza/internal/metadata"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza/operator"
 )
 
