@@ -238,11 +238,15 @@ func (i *Input) processEventWithRenderingInfoCustomRemote(ctx context.Context, e
 	return i.renderSimpleAndSend(ctx, event, config)
 }
 
-// sendEvent will send EventXML as an entry to the operator's output.
-func (i *Input) sendEvent(ctx context.Context, eventXML *EventXML, remote RemoteConfig) error {
-	var body any = eventXML.Original
+// sendEvent will send a parsedEvent as an entry to the operator's output.
+//
+// raw=true path: only event.getOriginal(), event.getSystemTime(), event.getLevel(),
+// and event.getRenderedLevel() are called. If you add a field access here that
+// runs when raw=true, add a corresponding method to parsedEvent and rawParsedEvent.
+func (i *Input) sendEvent(ctx context.Context, event parsedEvent, remote RemoteConfig) error {
+	var body any = event.getOriginal()
 	if !i.raw {
-		body = formattedBody(eventXML, i.eventDataFormat)
+		body = formattedBody(event.toEventXML(), i.eventDataFormat)
 	}
 
 	e, err := i.NewEntry(body)
@@ -250,15 +254,15 @@ func (i *Input) sendEvent(ctx context.Context, eventXML *EventXML, remote Remote
 		return fmt.Errorf("create entry: %w", err)
 	}
 
-	e.Timestamp = parseTimestamp(eventXML.TimeCreated.SystemTime)
-	e.Severity = parseSeverity(eventXML.RenderedLevel, eventXML.Level)
+	e.Timestamp = parseTimestamp(event.getSystemTime())
+	e.Severity = parseSeverity(event.getRenderedLevel(), event.getLevel())
 
 	if i.remote.Server != "" {
 		e.AddAttribute("server.address", remote.Server)
 	}
 
 	if i.includeLogRecordOriginal {
-		e.AddAttribute(string(conventions.LogRecordOriginalKey), eventXML.Original)
+		e.AddAttribute(string(conventions.LogRecordOriginalKey), event.getOriginal())
 	}
 
 	return i.Write(ctx, e)
