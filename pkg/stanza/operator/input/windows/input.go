@@ -48,8 +48,9 @@ type Input struct {
 	discoverDomainControllers bool
 
 	// Worker registry
-	workersMu sync.RWMutex
-	workers   map[string]*singleInputWorker // key: normalised server name
+	workersMu   sync.RWMutex
+	workers     map[string]*singleInputWorker // key: normalised server name
+	waitTimeout time.Duration
 }
 
 // newInput creates a new Input operator.
@@ -87,6 +88,7 @@ func newWorker(remote RemoteConfig, channel string, query *string, i *Input) *si
 		startRemoteSession:    i.startRemoteSession,
 		subscription:          i.subscription,
 		processEvent:          i.processEvent,
+		waitTimeout:           i.waitTimeout,
 	}
 	return w
 }

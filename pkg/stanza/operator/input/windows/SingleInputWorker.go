@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza/internal/metadata"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"golang.org/x/sys/windows"
@@ -55,11 +56,18 @@ type singleInputWorker struct {
 	persister operator.Persister
 
 	// Lifecycle
-	cancel              context.CancelFunc
+	cancel context.CancelFunc
+	// cancelEvent is a manual-reset Windows event handle signaled by Stop() to unblock
+	// WaitForMultipleObjects in awaitAndReadEvents. A plain context cancellation cannot
+	// interrupt a blocking Windows syscall, so this handle bridges Go's cancellation model
+	// to the Windows API layer.
+	cancelEvent windows.Handle
+
 	wg                  sync.WaitGroup
 	logger              *zap.Logger
 	ignoreChannelErrors bool
 	startRemoteSession  func(worker *singleInputWorker) error
+	waitTimeout         time.Duration
 
 	// Callback into parent (stateless, safe to share)
 	processEvent func(context.Context, Event, RemoteConfig) error
@@ -104,10 +112,20 @@ func (siw *singleInputWorker) start(ctx context.Context) error {
 	// 4. Start independent poll goroutine
 	siw.logger.Info(fmt.Sprintf("Started subscription for remote server: %s", siw.remote.Server))
 	siw.subscription = subscription
-	workerCtx, cancel := context.WithCancel(ctx)
-	siw.cancel = cancel
-	siw.wg.Add(1)
-	go siw.pollAndRead(workerCtx)
+	if metadata.StanzaWindowsEventDrivenScrapingFeatureGate.IsEnabled() {
+		cancelEvent, err := windows.CreateEvent(nil, 1, 0, nil) // manual-reset, initially non-signaled
+		if err != nil {
+			return fmt.Errorf("failed to create cancel event: %w", err)
+		}
+		siw.cancelEvent = cancelEvent
+		siw.wg.Add(1)
+		go siw.awaitAndReadEvents(ctx)
+	} else {
+		workerCtx, cancel := context.WithCancel(ctx)
+		siw.cancel = cancel
+		siw.wg.Add(1)
+		go siw.pollAndRead(workerCtx)
+	}
 
 	return nil
 }
@@ -116,8 +134,25 @@ func (siw *singleInputWorker) stop() error {
 	if siw.cancel != nil {
 		siw.cancel()
 	}
+
+	if siw.cancelEvent != 0 {
+		// If this fails, wg.Wait() below will block forever since awaitAndReadEvents will never
+		// return from WaitForMultipleObjects. Log loudly and continue.
+		if err := windows.SetEvent(siw.cancelEvent); err != nil {
+			siw.logger.Error("Failed to signal cancel event during stop; shutdown may hang", zap.Error(err))
+		}
+	}
+
 	siw.wg.Wait()
+
 	var errs error
+	if siw.cancelEvent != 0 {
+		if err := windows.CloseHandle(siw.cancelEvent); err != nil {
+			errs = multierr.Append(errs, fmt.Errorf("failed to close cancel event: %w", err))
+		}
+		siw.cancelEvent = 0
+	}
+
 	if err := siw.subscription.Close(); err != nil {
 		errs = multierr.Append(errs, fmt.Errorf("failed to close subscription: %w", err))
 	}
@@ -163,6 +198,29 @@ func (siw *singleInputWorker) stopSession() error {
 	}
 	siw.sessionHandle = 0
 	return nil
+}
+
+// awaitAndReadEvents is the event-driven alternative to pollAndRead. Instead of sleeping
+// for a fixed interval it blocks on a Windows wait object that is signaled by the subscription
+// when new events arrive. This reduces latency and avoids unnecessary wakeups.
+func (siw *singleInputWorker) awaitAndReadEvents(ctx context.Context) {
+	defer siw.wg.Done()
+
+	timeoutMs := uint32(siw.waitTimeout.Milliseconds())
+	for {
+		ready, err := siw.subscription.Wait(siw.cancelEvent, timeoutMs)
+		if err != nil {
+			siw.logger.Error("Failed to wait for subscription signal", zap.Error(err))
+			return
+		}
+		if !ready {
+			// cancel event was signaled
+			return
+		}
+
+		siw.eventsReadInPollCycle = 0
+		siw.read(ctx)
+	}
 }
 
 func (siw *singleInputWorker) pollAndRead(ctx context.Context) {
@@ -318,9 +376,9 @@ func (siw *singleInputWorker) getCurrentBatchSize() int {
 
 func (siw *singleInputWorker) initSubscription() Subscription {
 	if siw.isRemote() {
-		return NewRemoteSubscription(siw.remote.Server)
+		return NewRemoteSubscription(siw.remote.Server, siw.logger)
 	}
-	return NewLocalSubscription()
+	return NewLocalSubscription(siw.logger)
 }
 
 func workerKey(worker *singleInputWorker) string {
