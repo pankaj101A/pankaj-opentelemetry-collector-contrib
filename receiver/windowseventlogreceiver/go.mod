@@ -3,6 +3,8 @@ module github.com/open-telemetry/opentelemetry-collector-contrib/receiver/window
 go 1.25.0
 
 require (
+    github.com/alexbrainman/sspi v0.0.0-20250919150558-7d374ff0d59e
+	github.com/go-ldap/ldap/v3 v3.4.13
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.148.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza v0.148.0
 	github.com/stretchr/testify v1.11.1
