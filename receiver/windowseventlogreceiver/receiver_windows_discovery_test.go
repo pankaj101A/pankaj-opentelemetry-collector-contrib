@@ -112,7 +112,6 @@ func TestCreateLogsReceiverDomainControllerDiscoveryError(t *testing.T) {
 	assert.ErrorContains(t, err, "domain controller discovery failed")
 	assert.ErrorIs(t, err, discoveryErr)
 	_ = featuregate.GlobalRegistry().Set(metadata.DomainControllersAutodiscoveryFeatureGate.ID(), false)
-
 }
 
 func TestMultiLogsReceiverStartShutdown(t *testing.T) {
