@@ -69,7 +69,7 @@ func createLogsReceiver(
 
 	stanzaFactory := adapter.NewFactory(receiverType{}, metadata.LogsStability)
 
-	if receiverCfg.DiscoverDomainControllers {
+	if metadata.DomainControllersAutodiscoveryFeatureGate.IsEnabled() && receiverCfg.DiscoverDomainControllers {
 		remoteConfigs, err := getDomainControllersRemoteConfig(set.Logger, receiverCfg.InputConfig.Remote.Username, receiverCfg.InputConfig.Remote.Password)
 		if err != nil {
 			return nil, fmt.Errorf("domain controller discovery failed: %w", err)
