@@ -87,7 +87,6 @@ func TestCreateLogsReceiverWithDomainControllerDiscovery(t *testing.T) {
 	require.True(t, ok, "expected a *multiLogsReceiver when DiscoverDomainControllers is true")
 	assert.Len(t, multi.receivers, len(discoveredDCs))
 	_ = featuregate.GlobalRegistry().Set(metadata.DomainControllersAutodiscoveryFeatureGate.ID(), false)
-
 }
 
 func TestCreateLogsReceiverDomainControllerDiscoveryError(t *testing.T) {
