@@ -90,7 +90,7 @@ func TestCreateLogsReceiverWithDomainControllerDiscovery(t *testing.T) {
 }
 
 func TestCreateLogsReceiverDomainControllerDiscoveryError(t *testing.T) {
-	_ = featuregate.GlobalRegistry().Set(metadata.DomainControllersAutodiscoveryFeatureGate.ID(), false)
+	_ = featuregate.GlobalRegistry().Set(metadata.DomainControllersAutodiscoveryFeatureGate.ID(), true)
 	restoreDomainControllersFunc(t)
 
 	discoveryErr := errors.New("ldap connection refused")
